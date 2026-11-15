@@ -1,0 +1,134 @@
+:root {
+    --bg: #f6f4ec;
+    --surface: #ffffff;
+    --text: #1f2a24;
+    --muted: #5d6b63;
+    --accent: #2f7d4f;
+    --error: #b3261e;
+    --border: #d9d4c3;
+
+    color-scheme: light dark;
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #121714;
+        --surface: #1b221e;
+        --text: #e7ece8;
+        --muted: #9aa8a0;
+        --accent: #6fcf97;
+        --error: #f2b8b5;
+        --border: #2e3832;
+    }
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+}
+
+h1,
+h2 {
+    margin: 0 0 0.5rem;
+}
+
+.layout {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.status {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.status--ok {
+    color: var(--accent);
+}
+
+.status--error {
+    color: var(--error);
+}
+
+.dropzone {
+    display: grid;
+    place-items: center;
+    min-height: 240px;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    color: var(--muted);
+    overflow: hidden;
+}
+
+.dropzone:hover {
+    border-color: var(--accent);
+}
+
+.dropzone__preview {
+    max-width: 100%;
+    max-height: 320px;
+    object-fit: contain;
+}
+
+.results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.results__row {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr 4rem;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.results__bar {
+    height: 0.75rem;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.results__fill {
+    display: block;
+    height: 100%;
+    background: var(--muted);
+    transition: width 0.4s ease;
+}
+
+.results__fill--top {
+    background: var(--accent);
+}
+
+.results__value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

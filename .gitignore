@@ -1,0 +1,42 @@
+node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.env
+.env.*
+!.env.example
+
+coverage/
+dist/
+build/
+*.tsbuildinfo
+
+.DS_Store
+Thumbs.db
+
+*.log
+
+# Dataset images (size + copyright): only the folder skeleton (.gitkeep) and metadata are versioned
+data/raw/**
+data/inbox/**
+data/dataset/**
+data/sources/**
+data/cache/
+data/review/
+!data/**/
+!data/**/.gitkeep
+
+# Trained model artifacts
+models/**
+!models/.gitkeep
+
+# Image files (Zelda AI training dataset)
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.gif

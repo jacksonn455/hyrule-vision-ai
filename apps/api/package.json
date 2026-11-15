@@ -1,0 +1,15 @@
+{
+  "name": "@hyrule/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP API that receives uploaded images and returns the CNN classification",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "fastify": "^5.12.7"
+  }
+}

@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "compilerOptions": {
+        "target": "ES2023",
+        "lib": ["ES2023"],
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "forceConsistentCasingInFileNames": true,
+
+        // Code is executed without a compile step (Vite for the web app, Node's native
+        // type stripping for the API and ML scripts), so tsc is only used as a type checker.
+        "noEmit": true,
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "erasableSyntaxOnly": true,
+        "isolatedModules": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true
+    }
+}

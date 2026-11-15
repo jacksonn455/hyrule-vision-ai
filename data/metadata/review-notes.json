@@ -1,0 +1,9 @@
+[
+    "Every image was checked on numbered contact sheets (`npm run ml:review-dataset -- sheets`); 383 images were removed with a reason (`manual-review` in rejections.json).",
+    "Danbooru fan art rated \"sensitive\" (s) turned out to be mostly sexualised (swimsuits, bunny suits, pin-up poses), especially for female `other` characters (Midna, Purah, Mipha, Urbosa, Paya, Malon): all 270 such `other` images were removed, plus 15 Zelda ones; 27 Link and 29 Zelda \"s\" images that are not sexualised were kept. The collector now only accepts rating g (general) from this source.",
+    "Breath of the Wild screenshots: many show Link very small or from behind, and some show no character at all (fire, laser, shrine interiors, menus, map, dialogue and horse-registration screens). 82 screenshots were removed in total (including the wrong-caption cases below); the remaining ones still often show Link at a small scale, which is realistic but harder for a small CNN.",
+    "Caption-based labels of the BotW dataset were wrong in a few cases (e.g. Urbosa's memory scenes captioned as Zelda, Link visible next to enemies): removed as wrong or ambiguous subject.",
+    "Removed for wrong/several characters: Four Swords poster with many Links, Link with the King of Red Lions, Fierce Deity cosplay, a genderbent Link, group cosplay photos, Zelda statue images.",
+    "Wikipedia NES screenshots (Link and Ganon in The Legend of Zelda, 1986) show the character as a few pixels on a map: removed; NES coverage therefore needs sprites (manual Spriters Resource download).",
+    "Art-style mix is wide: anime/manga fan art, painterly fan art, chibi drawings, cel-shaded Wind Waker art, real cosplay photos, in-game 3D screenshots and official artwork."
+]

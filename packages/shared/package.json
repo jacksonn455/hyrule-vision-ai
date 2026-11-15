@@ -1,0 +1,13 @@
+{
+  "name": "@hyrule/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Class labels and API contract shared by the web app, the API and the ML package",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

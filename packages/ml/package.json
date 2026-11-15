@@ -1,0 +1,27 @@
+{
+  "name": "@hyrule/ml",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Image preprocessing, dataset loading, CNN definition and training scripts",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./classifier": "./src/classifier.ts"
+  },
+  "scripts": {
+    "check-env": "node src/scripts/check-env.ts",
+    "collect-dataset": "node src/scripts/collect-dataset.ts",
+    "import-images": "node src/scripts/import-images.ts",
+    "dataset-report": "node src/scripts/dataset-report.ts",
+    "review-dataset": "node src/scripts/review-dataset.ts",
+    "reorganize-raw": "node src/scripts/reorganize-raw.ts",
+    "sync-metadata": "node src/scripts/sync-metadata.ts",
+    "split-dataset": "node src/scripts/split-dataset.ts",
+    "train": "node src/scripts/train.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "sharp": "^0.35.5"
+  }
+}
