@@ -7,6 +7,9 @@ understand how each part of an image classifier works by building it.
 > **Status:** all roadmap steps are implemented: dataset (~660 images), preprocessing, split, CNN, training with
 > data augmentation, evaluation, inference API and UI. Accuracy is still modest (see [Results](#results)).
 
+<img width="1042" height="658" alt="image" src="https://github.com/user-attachments/assets/e0b63612-3ec6-40a3-b3da-47f6db8a256f" />
+
+
 ## Stack
 
 | Layer            | Technology                                      |
