@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { isClassLabel } from '@hyrule/shared'
+import { isCollectionLabel } from '@hyrule/shared'
 
 import { sha256 } from './hashing.ts'
 import { listImageFiles, toRepoPath } from './local-images.ts'
@@ -44,7 +44,7 @@ export async function syncWithDisk(store: MetadataStore, rawDir: string, repoRoo
             continue
         }
         const [, , label, subcategory] = found.split('/')
-        if (!label || !subcategory || !isClassLabel(label) || !isRawSubcategory(label, subcategory)) {
+        if (!label || !subcategory || !isCollectionLabel(label) || !isRawSubcategory(label, subcategory)) {
             report.unknownFolder.push(found)
             continue
         }

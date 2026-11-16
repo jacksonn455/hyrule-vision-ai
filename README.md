@@ -1,7 +1,8 @@
 # Hyrule Vision AI
 
-An educational full-stack application that classifies an image as **Link**, **Zelda** or **Other** using a
-**convolutional neural network trained from scratch** with TensorFlow.js. No pretrained models: the point is to
+An educational full-stack application that recognises **Zelda-series characters** (Link, Zelda, Midna, Skull Kid,
+Ganondorf, …) and guesses **which game** a Link or Zelda image comes from, using **convolutional neural networks
+trained from scratch** with TensorFlow.js. No pretrained models: the point is to
 understand how each part of an image classifier works by building it.
 
 > **Status:** all roadmap steps are implemented: dataset (~660 images), preprocessing, split, CNN, training with
@@ -52,33 +53,34 @@ understand how each part of an image classifier works by building it.
 ```bash
 npm install
 npm run ml:check-env   # verifies native TensorFlow + Sharp work on this machine
-npm run ml:split-dataset   # data/raw → data/dataset/{train,validation,test}
-npm run ml:train           # trains and saves models/hyrule-cnn (a few minutes on CPU)
+npm run ml:train:all   # split data/raw + train the character model + train the game model (minutes on CPU)
 npm run dev            # API on http://127.0.0.1:3333, web on http://localhost:5173
 ```
 
 ## Scripts
 
-| Script                       | Description                                                         |
-| ---------------------------- | ------------------------------------------------------------------- |
-| `npm run dev`                | Starts API and web together                                         |
-| `npm run dev:api`            | API only (restarts on change)                                       |
-| `npm run dev:web`            | Web only (Vite dev server, proxies `/api` to the API)               |
-| `npm run build`              | Type-checks and builds the web app                                  |
-| `npm run ml:check-env`       | Runs a convolution on the native TF backend + Sharp test            |
-| `npm run ml:collect-dataset` | Downloads, validates and files the raw dataset (resumable)          |
-| `npm run ml:import-images`   | Imports images/sprite sheets saved by hand into `data/inbox`        |
-| `npm run ml:review-dataset`  | Contact sheets for visual review / reject images                    |
-| `npm run ml:dataset-report`  | Writes `docs/research/DATASET-COLLECTION-REPORT.md`                 |
-| `npm run ml:sync-metadata`   | Updates `sources.json` after moving/deleting files by hand          |
-| `npm run ml:split-dataset`   | Stratified, seeded 70/15/15 split of `data/raw` into `data/dataset` |
-| `npm run ml:train`           | Trains the CNN, early stopping, evaluates on test → `models/`       |
-| `npm run ml:reorganize-raw`  | Re-files images when sub-folder rules change                        |
-| `npm run typecheck`          | `tsc` in every workspace                                            |
-| `npm run lint`               | ESLint (type-aware)                                                 |
-| `npm run format`             | Prettier                                                            |
-| `npm test`                   | Vitest                                                              |
-| `npm run check`              | typecheck + lint + format check + tests                             |
+| Script                       | Description                                                      |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `npm run dev`                | Starts API and web together                                      |
+| `npm run dev:api`            | API only (restarts on change)                                    |
+| `npm run dev:web`            | Web only (Vite dev server, proxies `/api` to the API)            |
+| `npm run build`              | Type-checks and builds the web app                               |
+| `npm run ml:check-env`       | Runs a convolution on the native TF backend + Sharp test         |
+| `npm run ml:collect-dataset` | Downloads, validates and files the raw dataset (resumable)       |
+| `npm run ml:import-images`   | Imports images/sprite sheets saved by hand into `data/inbox`     |
+| `npm run ml:review-dataset`  | Contact sheets for visual review / reject images                 |
+| `npm run ml:dataset-report`  | Writes `docs/research/DATASET-COLLECTION-REPORT.md`              |
+| `npm run ml:sync-metadata`   | Updates `sources.json` after moving/deleting files by hand       |
+| `npm run ml:split-dataset`   | Discovers classes, stratified 70/15/15 split into `data/dataset` |
+| `npm run ml:train`           | Trains the character CNN → `models/hyrule-cnn`                   |
+| `npm run ml:train:games`     | Trains the game CNN (Link / Zelda) → `models/hyrule-cnn-games`   |
+| `npm run ml:train:all`       | `split-dataset` + both trainings                                 |
+| `npm run ml:reorganize-raw`  | Re-files images when sub-folder rules change                     |
+| `npm run typecheck`          | `tsc` in every workspace                                         |
+| `npm run lint`               | ESLint (type-aware)                                              |
+| `npm run format`             | Prettier                                                         |
+| `npm test`                   | Vitest                                                           |
+| `npm run check`              | typecheck + lint + format check + tests                          |
 
 ## Roadmap
 
@@ -97,30 +99,52 @@ Each step is small and comes with a note in `docs/concepts/`.
 
 ### Where each step lives
 
-| Step                                                                                    | Code                                                                                 |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Preprocessing (decode → letterbox 96×96 → RGB bytes)                                    | [packages/ml/src/preprocessing.ts](packages/ml/src/preprocessing.ts)                 |
-| Split (class = first folder under `data/raw`: `link`, `zelda`, anything else = `other`) | [packages/ml/src/dataset/split.ts](packages/ml/src/dataset/split.ts)                 |
-| Loading tensors (`[0, 1]` floats + one-hot labels)                                      | [packages/ml/src/dataset/load.ts](packages/ml/src/dataset/load.ts)                   |
-| CNN architecture                                                                        | [packages/ml/src/model.ts](packages/ml/src/model.ts)                                 |
-| Training + early stopping + test evaluation                                             | [packages/ml/src/scripts/train.ts](packages/ml/src/scripts/train.ts)                 |
-| Data augmentation                                                                       | [packages/ml/src/augmentation.ts](packages/ml/src/augmentation.ts)                   |
-| Inference (load model + classify a buffer)                                              | [packages/ml/src/classifier.ts](packages/ml/src/classifier.ts)                       |
-| `POST /api/classify`                                                                    | [apps/api/src/routes/classify.ts](apps/api/src/routes/classify.ts)                   |
-| Probability bars                                                                        | [apps/web/src/components/ResultsPanel.tsx](apps/web/src/components/ResultsPanel.tsx) |
-| Metrics (confusion matrix, precision/recall, class weights)                             | [packages/ml/src/metrics.ts](packages/ml/src/metrics.ts)                             |
+| Step                                                              | Code                                                                                 |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Preprocessing (decode → letterbox 96×96 → RGB bytes)              | [packages/ml/src/preprocessing.ts](packages/ml/src/preprocessing.ts)                 |
+| Classes discovered from `data/raw` folders (characters and games) | [packages/ml/src/dataset/classes.ts](packages/ml/src/dataset/classes.ts)             |
+| Stratified split                                                  | [packages/ml/src/dataset/split.ts](packages/ml/src/dataset/split.ts)                 |
+| Loading tensors (`[0, 1]` floats + one-hot labels)                | [packages/ml/src/dataset/load.ts](packages/ml/src/dataset/load.ts)                   |
+| CNN architecture                                                  | [packages/ml/src/model.ts](packages/ml/src/model.ts)                                 |
+| Training + early stopping + test evaluation                       | [packages/ml/src/scripts/train.ts](packages/ml/src/scripts/train.ts)                 |
+| Data augmentation                                                 | [packages/ml/src/augmentation.ts](packages/ml/src/augmentation.ts)                   |
+| Inference (load model + classify a buffer)                        | [packages/ml/src/classifier.ts](packages/ml/src/classifier.ts)                       |
+| `POST /api/classify`                                              | [apps/api/src/routes/classify.ts](apps/api/src/routes/classify.ts)                   |
+| Probability bars                                                  | [apps/web/src/components/ResultsPanel.tsx](apps/web/src/components/ResultsPanel.tsx) |
+| Metrics (confusion matrix, precision/recall, class weights)       | [packages/ml/src/metrics.ts](packages/ml/src/metrics.ts)                             |
 
-The trained model is saved to `models/hyrule-cnn/` (`model.json`, `weights.bin`, `metrics.json`), git-ignored.
+The trained models are saved to `models/hyrule-cnn/` and `models/hyrule-cnn-games/` (`model.json`, `weights.bin`,
+`labels.json`, `metrics.json`), git-ignored.
+
+## Adding characters and improving accuracy
+
+The classes are **not hard-coded**: they come from the folders in `data/raw`.
+
+- **Characters:** every top-level folder of `data/raw` (`link`, `midna`, `skull-kid`, …) with at least 10 images
+  (`--min-images`) becomes a class. Smaller folders, and `objects`/`enemies`/`npcs`/`creatures`, are merged into
+  `other`. To add a character, create `data/raw/<name>/` with images.
+- **Games:** images in `data/raw/<character>/<game>/` (Link and Zelda today) train a second CNN that guesses the game;
+  Link and Zelda are pooled per game because the game is mostly the art style. `unspecified` is ignored, and games with
+  fewer than 10 images are skipped. The UI shows the game under the name only for characters this model knows.
+- After adding images, run `npm run ml:train:all` and restart the API. The page lists every trained character and
+  game with its **test recall** (how many of its test images were recognised): ≥ 70% is marked _good_, lower is
+  _learning_. Classes with only 1–2 test images have very noisy scores: more images fix both problems.
+
+```bash
+npm run ml:split-dataset -- --min-images 15   # stricter: only characters with 15+ images get their own class
+```
 
 ## API
 
 ```bash
 curl -X POST http://127.0.0.1:3333/api/classify \n  -H "Content-Type: image/jpeg" --data-binary @my-image.jpg
-# {"prediction":"link","probabilities":[{"label":"link","probability":0.81}, ...]}
+# {"prediction":"link","probabilities":[{"label":"link","probability":0.81}, ...],
+#  "game":{"prediction":"breath-of-the-wild","probabilities":[...]}}
 ```
 
 Accepted types: `image/jpeg`, `image/png`, `image/webp` (max 10 MB). Errors: `415` wrong type, `422` unreadable image,
-`503` no trained model (`GET /api/health` shows `modelLoaded`). Set `MODEL_DIR` to use another model folder.
+`503` no trained model (`GET /api/health` shows `modelLoaded`). Set `MODEL_DIR` / `GAME_MODEL_DIR` to use other model folders.
+`GET /api/health` also returns the trained classes with their test metrics (`model`, `gameModel`).
 
 ## Results
 
@@ -135,10 +159,19 @@ Chance level is 33.3%. Without augmentation the training accuracy kept rising (8
 was memorising. Augmentation delays that, but ~470 training images of mixed styles (cosplay, screenshots, fan art,
 sprites) remain the main limit; Zelda (fewest images) is the weakest class. Exact numbers vary slightly between runs.
 
+**Per-character model (10 classes, 2026-11-16):** test accuracy **52.6%** (chance 10%). Recall per class:
+link 56%, zelda 43%, skull-kid 80%, mipha 60%, midna 50%, ganondorf 75%, malon 50%, paya 100%, saria 0%, other 29%.
+Splitting "other" into named characters makes the task much harder than Link/Zelda/Other, and the small characters
+have only 2–5 test images, so their scores swing a lot between runs. More images per character is the main lever.
+
+**Game model (Link + Zelda, 4 games):** test accuracy **50%** (chance 25%). Breath of the Wild 79% recall
+(85 training images); Wind Waker, Ocarina of Time and Tears of the Kingdom are still below 35% with 26–36 images each.
+Twilight Princess (9), Majora's Mask (8), NES (7) and Skyward Sword (5) need a few more images to become classes.
+
 ## Testing manually
 
-1. In WSL: `npm run ml:split-dataset && npm run ml:train` (skip if `models/hyrule-cnn/model.json` exists).
-2. `npm run dev`; the API log should say `model loaded`.
+1. In WSL: `npm run ml:train:all` (skip if `models/hyrule-cnn/model.json` exists).
+2. `npm run dev`; the API log lists the character and game classes it loaded.
 3. Open http://localhost:5173: the header shows the API status; drop a JPEG/PNG/WebP image and read the bars.
 4. Without a model, the page shows the 503 message explaining how to train one.
 

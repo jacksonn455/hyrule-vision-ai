@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import { createThrottle } from '../collection/http-client.ts'
 import { acquireMetadataLock } from '../collection/metadata-lock.ts'
@@ -32,7 +32,7 @@ const { values: args } = parseArgs({
 })
 
 /** url → where the current rules put it. */
-const expected = new Map<string, { label: ClassLabel; subcategory: RawSubcategory }>()
+const expected = new Map<string, { label: CollectionLabel; subcategory: RawSubcategory }>()
 
 const catalog = JSON.parse(await readFile(path.join(METADATA_DIR, 'commons-catalog.json'), 'utf8')) as {
     files: CommonsFile[]

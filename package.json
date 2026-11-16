@@ -2,7 +2,7 @@
   "name": "hyrule-vision-ai",
   "version": "0.1.0",
   "private": true,
-  "description": "Educational full-stack image classifier (Link / Zelda / Other) with a CNN trained from scratch in TensorFlow.js",
+  "description": "Educational full-stack image classifier: CNNs trained from scratch in TensorFlow.js that recognise Zelda characters (and the game of Link / Zelda images)",
   "type": "module",
   "engines": {
     "node": ">=22.18"
@@ -32,6 +32,8 @@
     "ml:sync-metadata": "npm run sync-metadata -w @hyrule/ml",
     "ml:split-dataset": "npm run split-dataset -w @hyrule/ml --",
     "ml:train": "npm run train -w @hyrule/ml --",
+    "ml:train:games": "npm run train -w @hyrule/ml -- --task games",
+    "ml:train:all": "npm run ml:split-dataset && npm run ml:train && npm run ml:train:games",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {

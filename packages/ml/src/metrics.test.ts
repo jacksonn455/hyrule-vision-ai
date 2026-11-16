@@ -6,7 +6,7 @@ describe('evaluate', () => {
     it('builds the confusion matrix, accuracy, precision and recall', () => {
         // actual:    link, link, zelda, other
         // predicted: link, zelda, zelda, other
-        const result = evaluate([0, 0, 1, 2], [0, 1, 1, 2])
+        const result = evaluate([0, 0, 1, 2], [0, 1, 1, 2], ['link', 'zelda', 'other'])
         expect(result.accuracy).toBe(0.75)
         expect(result.confusionMatrix).toEqual([
             [1, 1, 0],
@@ -20,6 +20,6 @@ describe('evaluate', () => {
 
 describe('classWeights', () => {
     it('gives rarer classes a bigger weight', () => {
-        expect(classWeights([0, 0, 0, 0, 1, 1])).toEqual({ 0: 0.5, 1: 1, 2: 0 })
+        expect(classWeights([0, 0, 0, 0, 1, 1], 3)).toEqual({ 0: 0.5, 1: 1, 2: 0 })
     })
 })

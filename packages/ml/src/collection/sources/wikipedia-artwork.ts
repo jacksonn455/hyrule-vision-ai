@@ -1,4 +1,4 @@
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import { hasAllowedExtension } from '../image-validator.ts'
 import type { RawSubcategory } from '../taxonomy.ts'
@@ -13,7 +13,7 @@ export const WIKIPEDIA_SOURCE_NAME = 'English Wikipedia (official artwork)'
  * Tingle, Navi). Hand-picked: each file shows one character. Left out on purpose: photos of voice actors,
  * "SheikZelda.png" (two forms side by side) and the Walk of Game star plaque.
  */
-export const WIKIPEDIA_ARTWORK: readonly { title: string; label: ClassLabel; subcategory: RawSubcategory }[] = [
+export const WIKIPEDIA_ARTWORK: readonly { title: string; label: CollectionLabel; subcategory: RawSubcategory }[] = [
     { title: 'File:Legend of Zelda NES.PNG', label: 'link', subcategory: 'nes' },
     { title: 'File:Link (Hyrule Historia).png', label: 'link', subcategory: 'unspecified' },
     { title: 'File:Link of the Wild.png', label: 'link', subcategory: 'breath-of-the-wild' },

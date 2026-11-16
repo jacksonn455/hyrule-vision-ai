@@ -12,7 +12,7 @@ export interface AppOptions extends FastifyServerOptions {
 export function buildApp({ classifier = null, ...options }: AppOptions = {}): FastifyInstance {
     const app = Fastify(options)
 
-    registerHealthRoutes(app, classifier !== null)
+    registerHealthRoutes(app, classifier)
     registerClassifyRoutes(app, classifier)
 
     return app

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import type { RawSubcategory } from '../taxonomy.ts'
 import { isRawSubcategory } from '../taxonomy.ts'
@@ -18,7 +18,7 @@ export interface DeepghsCharacter {
     tag: string
     /** Folder in the dataset repository, e.g. "e9/princess_zelda". */
     folder: string
-    label: ClassLabel
+    label: CollectionLabel
     /** Used when the post does not name exactly one game. */
     subcategory: RawSubcategory
 }
@@ -63,7 +63,7 @@ export const DEEPGHS_CHARACTERS: readonly DeepghsCharacter[] = [
  */
 const EXCLUDED_TAGS = ['sheik', 'wolf_link', 'fierce_deity', 'navi', 'korok', 'majora_(entity)', 'revali']
 
-const LABEL_BY_TAG = new Map<string, ClassLabel | 'excluded'>([
+const LABEL_BY_TAG = new Map<string, CollectionLabel | 'excluded'>([
     ...DEEPGHS_CHARACTERS.map((c) => [c.tag, c.label] as const),
     ...EXCLUDED_TAGS.map((tag) => [tag, 'excluded'] as const),
 ])
@@ -103,7 +103,7 @@ export interface DeepghsCropMeta {
 }
 
 export type CropDecision =
-    | { label: ClassLabel; subcategory: RawSubcategory; game?: RawSubcategory }
+    | { label: CollectionLabel; subcategory: RawSubcategory; game?: RawSubcategory }
     | { rejected: RejectionReason; detail: string }
 
 /** Game named in the post's copyright tags, only when exactly one is named. */
@@ -146,7 +146,7 @@ export function classifyCrop(character: DeepghsCharacter, meta: DeepghsCropMeta)
 
 function cropCandidate(
     character: DeepghsCharacter,
-    decision: { label: ClassLabel; subcategory: RawSubcategory },
+    decision: { label: CollectionLabel; subcategory: RawSubcategory },
     filename: string,
     meta: DeepghsCropMeta,
     cachedFile: string,

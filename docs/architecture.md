@@ -29,10 +29,13 @@ same resize method, same pixel scaling). If the API had its own copy of that cod
 copies would silently degrade predictions. This problem is called **training/serving skew**, and the simple
 fix is to have one preprocessing function used by both.
 
-### Why the label order lives in `shared`
+### Why the label order is saved next to the model
 
-The model's output is just an array like `[0.81, 0.12, 0.07]`. Its meaning comes entirely from the order of
-`CLASS_LABELS`. Training, the API and the UI all read that one constant.
+The model's output is just an array like `[0.81, 0.12, 0.07, …]`. Its meaning comes entirely from the order of the
+classes. Classes are discovered from the `data/raw` folders by `ml:split-dataset` (`data/dataset/<task>/classes.json`),
+and training writes that order to `models/<model>/labels.json` before saving any weights. The API reads it from there
+and checks it matches the number of model outputs, so adding a character never needs a code change and a model is
+never paired with the wrong labels.
 
 ## Technical decisions
 

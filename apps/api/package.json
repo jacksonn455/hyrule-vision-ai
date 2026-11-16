@@ -5,8 +5,8 @@
   "description": "HTTP API that receives uploaded images and returns the CNN classification",
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
-    "start": "node --env-file-if-exists=.env src/server.ts",
+    "dev": "node --watch src/server.ts",
+    "start": "node src/server.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

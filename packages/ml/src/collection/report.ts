@@ -1,4 +1,4 @@
-import { CLASS_LABELS } from '@hyrule/shared'
+import { COLLECTION_LABELS } from '@hyrule/shared'
 
 import type { SourceFinding } from './sources/source-research.ts'
 import { RAW_SUBCATEGORIES } from './taxonomy.ts'
@@ -48,11 +48,11 @@ export function buildCollectionReport({
     const origins = ['official', 'fan-made', 'unknown'] as const
     const failed = rejections.filter((r) => r.reason === 'download-failed')
     const byLicense = countBy(images, (i) => i.license)
-    const counts = CLASS_LABELS.map((label) => byLabel.get(label) ?? 0)
+    const counts = COLLECTION_LABELS.map((label) => byLabel.get(label) ?? 0)
     const max = Math.max(...counts)
 
     const gaps: string[] = []
-    for (const label of CLASS_LABELS) {
+    for (const label of COLLECTION_LABELS) {
         const count = byLabel.get(label) ?? 0
         if (count < 100) gaps.push(`**${label}** has ${count} images, below the initial target of 100.`)
         if (max > 0 && count < max * 0.5)
@@ -84,14 +84,14 @@ export function buildCollectionReport({
         '',
         table(
             ['Category', 'Images'],
-            CLASS_LABELS.map((label) => [label, byLabel.get(label) ?? 0]),
+            COLLECTION_LABELS.map((label) => [label, byLabel.get(label) ?? 0]),
         ),
         '',
         '## 3. Images per game / sub-category',
         '',
         table(
             ['Category', 'Sub-category', 'Images'],
-            CLASS_LABELS.flatMap((label) =>
+            COLLECTION_LABELS.flatMap((label) =>
                 RAW_SUBCATEGORIES[label].map((sub) => [label, sub, bySub.get(`${label}/${sub}`) ?? 0]),
             ),
         ),
@@ -120,18 +120,18 @@ export function buildCollectionReport({
         '## 7. Sources and content origin',
         '',
         table(
-            ['Source', ...CLASS_LABELS, 'Total'],
+            ['Source', ...COLLECTION_LABELS, 'Total'],
             sourceNames.map((source) => {
-                const perLabel = CLASS_LABELS.map((label) => bySourceLabel.get(`${source}|${label}`) ?? 0)
+                const perLabel = COLLECTION_LABELS.map((label) => bySourceLabel.get(`${source}|${label}`) ?? 0)
                 return [source, ...perLabel, perLabel.reduce((a, b) => a + b, 0)]
             }),
         ),
         '',
         table(
-            ['Content origin', ...CLASS_LABELS],
+            ['Content origin', ...COLLECTION_LABELS],
             origins.map((origin) => [
                 origin,
-                ...CLASS_LABELS.map((label) => byOriginLabel.get(`${origin}|${label}`) ?? 0),
+                ...COLLECTION_LABELS.map((label) => byOriginLabel.get(`${origin}|${label}`) ?? 0),
             ]),
         ),
         '',
@@ -165,7 +165,7 @@ export function buildCollectionReport({
                       '. Document their source or move them out before training.',
               ]
             : []),
-        ...CLASS_LABELS.map((label) => {
+        ...COLLECTION_LABELS.map((label) => {
             const total = byLabel.get(label) ?? 0
             const share = (origin: string) =>
                 Math.round((100 * (byOriginLabel.get(`${origin}|${label}`) ?? 0)) / (total || 1))

@@ -4,8 +4,8 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
-import type { ClassLabel } from '@hyrule/shared'
-import { isClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
+import { isCollectionLabel } from '@hyrule/shared'
 import sharp from 'sharp'
 
 import { hasAllowedExtension } from './image-validator.ts'
@@ -107,7 +107,7 @@ export async function readZoneIdentifiers(files: readonly string[]): Promise<Map
 export interface ManualFile {
     /** Absolute path of the file to read. */
     file: string
-    label: ClassLabel
+    label: CollectionLabel
     subcategory: RawSubcategory
     /** Name the user gave the file (for frames: "<sheet name>-frame-03"). */
     originalFilename: string
@@ -145,7 +145,7 @@ export function manualCandidate(input: ManualFile): ImageCandidate {
 
 export interface InboxFile {
     file: string
-    label: ClassLabel
+    label: CollectionLabel
     subcategory: RawSubcategory
     /** True for files under data/inbox/sprite-sheets/: cut into frames before import. */
     isSpriteSheet: boolean
@@ -172,7 +172,7 @@ export async function listInbox(inboxDir: string): Promise<{ files: InboxFile[];
             !subcategory ||
             !name ||
             rest.length > 0 ||
-            !isClassLabel(label) ||
+            !isCollectionLabel(label) ||
             !isRawSubcategory(label, subcategory)
         ) {
             misplaced.push(file)

@@ -1,22 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { labelFromRawPath, stratifiedSplit } from './split.ts'
-
-describe('labelFromRawPath', () => {
-    it('maps link/zelda folders to their class and anything else to other', () => {
-        expect(labelFromRawPath('link/wind-waker/a.jpg')).toMatchObject({ label: 'link', group: 'link/wind-waker' })
-        expect(labelFromRawPath('zelda/a.jpg').label).toBe('zelda')
-        expect(labelFromRawPath('midna/a.jpg')).toMatchObject({ label: 'other', group: 'midna' })
-        expect(labelFromRawPath('other/midna/a.jpg').label).toBe('other')
-    })
-})
+import { characterClasses } from './classes.ts'
+import { stratifiedSplit } from './split.ts'
 
 describe('stratifiedSplit', () => {
-    const images = [
-        ...Array.from({ length: 20 }, (_, i) => labelFromRawPath(`link/botw/${i}.jpg`)),
-        ...Array.from({ length: 20 }, (_, i) => labelFromRawPath(`zelda/tp/${i}.jpg`)),
-        ...Array.from({ length: 2 }, (_, i) => labelFromRawPath(`ravio/${i}.jpg`)),
+    const paths = [
+        ...Array.from({ length: 20 }, (_, i) => `link/botw/${i}.jpg`),
+        ...Array.from({ length: 20 }, (_, i) => `zelda/tp/${i}.jpg`),
+        ...Array.from({ length: 2 }, (_, i) => `ravio/${i}.jpg`),
     ]
+    const { images } = characterClasses(paths)
 
     it('splits every folder 70/15/15, keeps tiny folders in train, loses nothing', () => {
         const split = stratifiedSplit(images)

@@ -19,8 +19,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { CLASS_LABELS, isClassLabel } from '@hyrule/shared'
-import type { ClassLabel } from '@hyrule/shared'
+import { COLLECTION_LABELS, isCollectionLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import { DatasetCollector } from '../collection/collector.ts'
 import type { Outcome } from '../collection/collector.ts'
@@ -82,7 +82,7 @@ let fromInbox = true
 if (positionals.length > 0) {
     fromInbox = false
     const label = args.label ?? fail('--label is required when importing files by path (link, zelda or other)')
-    if (!isClassLabel(label)) fail(`--label must be one of: ${CLASS_LABELS.join(', ')}`)
+    if (!isCollectionLabel(label)) fail(`--label must be one of: ${COLLECTION_LABELS.join(', ')}`)
     const subcategory =
         args.subcategory ?? (label === 'other' ? fail('--subcategory is required for "other"') : 'unspecified')
     if (!isRawSubcategory(label, subcategory)) {
@@ -182,7 +182,7 @@ const collector = new DatasetCollector({
     limits: DEFAULT_IMAGE_LIMITS,
 })
 const results: { candidate: ImageCandidate; outcome: Outcome }[] = []
-const unlimited = Object.fromEntries(CLASS_LABELS.map((l) => [l, Infinity])) as Record<ClassLabel, number>
+const unlimited = Object.fromEntries(COLLECTION_LABELS.map((l) => [l, Infinity])) as Record<CollectionLabel, number>
 await collector.collect(candidates, {
     targets: unlimited,
     onOutcome: (candidate, outcome) => results.push({ candidate, outcome }),

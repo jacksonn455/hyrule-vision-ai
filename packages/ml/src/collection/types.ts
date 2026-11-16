@@ -1,4 +1,4 @@
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import type { RawSubcategory } from './taxonomy.ts'
 
@@ -16,7 +16,7 @@ export interface ImageCandidate {
     sourceName: string
     /** Original title, used to build a descriptive filename. */
     title: string
-    label: ClassLabel
+    label: CollectionLabel
     subcategory: RawSubcategory
     /** Short license name, e.g. "CC BY-SA 4.0". */
     license: string
@@ -101,7 +101,7 @@ export interface Rejection {
     title: string
     sourceName: string
     /** `null` when the image was refused before a label could be decided (e.g. unidentified character). */
-    label: ClassLabel | null
+    label: CollectionLabel | null
     subcategory: string
     reason: RejectionReason
     detail: string

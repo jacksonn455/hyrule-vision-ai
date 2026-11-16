@@ -1,27 +1,7 @@
-import type { ClassLabel } from '@hyrule/shared'
-
 import type { DatasetSplit } from '../paths.ts'
-
-export interface LabeledImage {
-    /** Path relative to data/raw, with forward slashes, e.g. "link/wind-waker/x.jpg". */
-    relativePath: string
-    label: ClassLabel
-    /** Folder the image came from (e.g. "link/wind-waker", "midna"); used to stratify. */
-    group: string
-}
+import type { LabeledImage } from './classes.ts'
 
 export const SPLIT_RATIOS: Record<DatasetSplit, number> = { train: 0.7, validation: 0.15, test: 0.15 }
-
-/**
- * The class is the first folder under data/raw: "link" and "zelda" are their classes and every other folder
- * (ganondorf, midna, other/…) is "other", since "other" means "anything that is not Link or Zelda".
- */
-export function labelFromRawPath(relativePath: string): LabeledImage {
-    const parts = relativePath.split('/')
-    const top = parts[0]!
-    const label: ClassLabel = top === 'link' || top === 'zelda' ? top : 'other'
-    return { relativePath, label, group: parts.slice(0, -1).join('/') || top }
-}
 
 /** Small deterministic PRNG (mulberry32): the same seed always gives the same split, so results are reproducible. */
 export function seededRandom(seed: number): () => number {

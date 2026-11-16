@@ -5,6 +5,7 @@
     --muted: #5d6b63;
     --accent: #2f7d4f;
     --error: #b3261e;
+    --warning: #9a6700;
     --border: #d9d4c3;
 
     color-scheme: light dark;
@@ -22,6 +23,7 @@
         --muted: #9aa8a0;
         --accent: #6fcf97;
         --error: #f2b8b5;
+        --warning: #e3b341;
         --border: #2e3832;
     }
 }
@@ -103,7 +105,7 @@ h2 {
 
 .results__row {
     display: grid;
-    grid-template-columns: 4.5rem 1fr 4rem;
+    grid-template-columns: 8rem 1fr 4rem;
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0;
@@ -131,4 +133,84 @@ h2 {
 .results__value {
     text-align: right;
     font-variant-numeric: tabular-nums;
+}
+
+.prediction {
+    margin-bottom: 0.75rem;
+}
+
+.prediction__name {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.prediction__game {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.game-details {
+    margin-top: 0.75rem;
+}
+
+.game-details summary {
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.section-title {
+    margin-top: 1.5rem;
+}
+
+.classes {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+}
+
+.classes__item {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.classes__name {
+    font-weight: 600;
+}
+
+.classes__score {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.classes__meta {
+    font-size: 0.8rem;
+}
+
+.badge {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+}
+
+.badge--good {
+    color: var(--accent);
+}
+
+.badge--low {
+    color: var(--warning);
+}
+
+.badge--muted {
+    color: var(--muted);
 }

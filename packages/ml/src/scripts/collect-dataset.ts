@@ -12,8 +12,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { CLASS_LABELS } from '@hyrule/shared'
-import type { ClassLabel } from '@hyrule/shared'
+import { COLLECTION_LABELS } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import { DatasetCollector } from '../collection/collector.ts'
 import { diversify } from '../collection/diversify.ts'
@@ -154,8 +154,8 @@ const ordered = diversify(candidates, [
 ])
 
 const target = Number(args.target)
-const targets = Object.fromEntries(CLASS_LABELS.map((label) => [label, target])) as Record<ClassLabel, number>
-for (const label of CLASS_LABELS) {
+const targets = Object.fromEntries(COLLECTION_LABELS.map((label) => [label, target])) as Record<CollectionLabel, number>
+for (const label of COLLECTION_LABELS) {
     const planned = ordered.filter((c) => c.label === label)
     const counts = new Map<string, number>()
     for (const c of planned)
@@ -186,5 +186,5 @@ const collector = new DatasetCollector({
 const summary = await collector.collect(ordered, { targets, overwrite: args.overwrite })
 
 console.log('\nsummary:', summary)
-for (const label of CLASS_LABELS) console.log(`${label}: ${store.countByLabel(label)} images`)
+for (const label of COLLECTION_LABELS) console.log(`${label}: ${store.countByLabel(label)} images`)
 await releaseLock()

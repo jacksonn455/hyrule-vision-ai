@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import { RAW_DATA_DIR } from '../paths.ts'
 
@@ -70,7 +70,7 @@ export const RAW_SUBCATEGORIES = {
         'objects',
         'other-characters',
     ],
-} as const satisfies Record<ClassLabel, readonly string[]>
+} as const satisfies Record<CollectionLabel, readonly string[]>
 
 /** Different names for the same character ("True Midna" is Midna's true form). */
 const CHARACTER_ALIASES: Record<string, string> = { sydon: 'sidon', 'midna-true': 'midna' }
@@ -93,14 +93,14 @@ export function otherCharacterFolder(name: string): RawSubcategory {
         : 'other-characters'
 }
 
-export type RawSubcategory = (typeof RAW_SUBCATEGORIES)[ClassLabel][number]
+export type RawSubcategory = (typeof RAW_SUBCATEGORIES)[CollectionLabel][number]
 
-export function isRawSubcategory(label: ClassLabel, subcategory: string): subcategory is RawSubcategory {
+export function isRawSubcategory(label: CollectionLabel, subcategory: string): subcategory is RawSubcategory {
     return (RAW_SUBCATEGORIES[label] as readonly string[]).includes(subcategory)
 }
 
 /** e.g. data/raw/link/wind-waker */
-export function rawSubcategoryDir(label: ClassLabel, subcategory: RawSubcategory, rawDir = RAW_DATA_DIR): string {
+export function rawSubcategoryDir(label: CollectionLabel, subcategory: RawSubcategory, rawDir = RAW_DATA_DIR): string {
     if (!isRawSubcategory(label, subcategory)) {
         throw new Error(`"${String(subcategory)}" is not a sub-category of "${label}"`)
     }

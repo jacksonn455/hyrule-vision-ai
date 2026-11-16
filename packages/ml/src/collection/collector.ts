@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import type { ClassLabel } from '@hyrule/shared'
+import type { CollectionLabel } from '@hyrule/shared'
 
 import type { DuplicateIndex } from './duplicate-index.ts'
 import { buildImageFilename } from './filenames.ts'
@@ -27,7 +27,7 @@ export interface CollectorDeps {
 
 export interface CollectOptions {
     /** Stop collecting a label once it has this many images (including images from earlier runs). */
-    targets: Record<ClassLabel, number>
+    targets: Record<CollectionLabel, number>
     /** Replace a file that already exists at the destination. Off by default. */
     overwrite?: boolean
     /** Called after each candidate with what happened to it (e.g. to build a per-file import summary). */

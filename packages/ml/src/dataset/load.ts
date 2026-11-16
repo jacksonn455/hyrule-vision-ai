@@ -1,43 +1,56 @@
-import { readdir } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
 import tf from '@tensorflow/tfjs-node'
 
-import { CLASS_LABELS, type ClassLabel } from '@hyrule/shared'
-
 import { hasAllowedExtension } from '../collection/image-validator.ts'
-import { type DatasetSplit, datasetClassDir } from '../paths.ts'
+import { type DatasetSplit, type Task, datasetClassDir, taskDatasetDir } from '../paths.ts'
 import { IMAGE_CHANNELS, IMAGE_SIZE, imageToPixels } from '../preprocessing.ts'
+import type { TaskClasses } from './classes.ts'
 
 /** Bytes 0..255 → floats 0..1. Small, similar-sized inputs keep gradients stable during training. */
 export function pixelsToTensor(pixels: Uint8Array): tf.Tensor3D {
     return tf.tidy(() => tf.tensor3d(pixels, [IMAGE_SIZE, IMAGE_SIZE, IMAGE_CHANNELS], 'int32').toFloat().div(255))
 }
 
+export const CLASSES_FILE = 'classes.json'
+
+/** data/dataset/<task>/classes.json, written by split-dataset. */
+export async function readTaskClasses(task: Task): Promise<TaskClasses> {
+    const file = path.join(taskDatasetDir(task), CLASSES_FILE)
+    try {
+        return JSON.parse(await readFile(file, 'utf8')) as TaskClasses
+    } catch {
+        throw new Error(`${file} not found: run \`npm run ml:split-dataset\` first`)
+    }
+}
+
 export interface LoadedSplit {
     /** [n, IMAGE_SIZE, IMAGE_SIZE, 3] images in [0, 1]. */
     xs: tf.Tensor4D
-    /** [n, 3] one-hot labels, column order = CLASS_LABELS (link = [1, 0, 0]). */
+    /** [n, classes] one-hot labels, column order = `labels` passed to loadSplit. */
     ys: tf.Tensor2D
-    labels: ClassLabel[]
+    /** Class index of every image (position in `labels`). */
+    indices: number[]
     files: string[]
 }
 
 /**
- * Loads a whole split into memory. ~650 images x 96x96x3 floats ≈ 70 MB, so batching from disk is unnecessary:
+ * Loads a whole split into memory. ~1000 images x 96x96x3 floats ≈ 110 MB, so batching from disk is unnecessary:
  * model.fit() still feeds the network in mini-batches (`batchSize`). Unreadable images are skipped, not fatal.
  */
-export async function loadSplit(split: DatasetSplit): Promise<LoadedSplit> {
+export async function loadSplit(task: Task, split: DatasetSplit, labels: readonly string[]): Promise<LoadedSplit> {
     const pixels: Uint8Array[] = []
-    const labels: ClassLabel[] = []
+    const indices: number[] = []
     const files: string[] = []
-    for (const label of CLASS_LABELS) {
-        const dir = datasetClassDir(split, label)
-        for (const name of (await readdir(dir)).filter(hasAllowedExtension).sort()) {
+    for (const [index, label] of labels.entries()) {
+        const dir = datasetClassDir(task, split, label)
+        const names = await readdir(dir).catch(() => [] as string[])
+        for (const name of names.filter(hasAllowedExtension).sort()) {
             const file = path.join(dir, name)
             try {
                 pixels.push(await imageToPixels(file))
-                labels.push(label)
+                indices.push(index)
                 files.push(file)
             } catch (error) {
                 console.warn(`skipping unreadable ${file}: ${(error as Error).message}`)
@@ -53,16 +66,6 @@ export async function loadSplit(split: DatasetSplit): Promise<LoadedSplit> {
             .toFloat()
             .div<tf.Tensor4D>(255),
     )
-    const ys = tf.tidy(() =>
-        tf
-            .oneHot(
-                tf.tensor1d(
-                    labels.map((l) => CLASS_LABELS.indexOf(l)),
-                    'int32',
-                ),
-                CLASS_LABELS.length,
-            )
-            .toFloat(),
-    ) as tf.Tensor2D
-    return { xs, ys, labels, files }
+    const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(indices, 'int32'), labels.length).toFloat()) as tf.Tensor2D
+    return { xs, ys, indices, files }
 }

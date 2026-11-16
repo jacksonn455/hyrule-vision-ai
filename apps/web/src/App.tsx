@@ -4,6 +4,7 @@ import { classifyImage } from './api/client.ts'
 import { ApiStatus } from './components/ApiStatus.tsx'
 import { ImageUploader } from './components/ImageUploader.tsx'
 import { ResultsPanel, type ClassificationState } from './components/ResultsPanel.tsx'
+import { TrainedClasses } from './components/TrainedClasses.tsx'
 import { useApiHealth } from './hooks/useApiHealth.ts'
 
 export function App() {
@@ -32,14 +33,20 @@ export function App() {
             <header>
                 <h1>Hyrule Vision AI</h1>
                 <p className="muted">
-                    A convolutional neural network, trained from scratch, that tells Link from Zelda.
+                    Convolutional neural networks, trained from scratch, that recognise Zelda characters and guess which
+                    game Link or Zelda comes from.
                 </p>
                 <ApiStatus state={health} />
             </header>
             <div className="grid">
                 <ImageUploader file={file} onFileSelected={handleFileSelected} />
-                <ResultsPanel state={classification} />
+                <ResultsPanel state={classification} labels={health.status === 'online' ? health.health.labels : []} />
             </div>
+            {health.status === 'online' && health.health.model && (
+                <div className="grid">
+                    <TrainedClasses model={health.health.model} gameModel={health.health.gameModel} />
+                </div>
+            )}
         </main>
     )
 }
