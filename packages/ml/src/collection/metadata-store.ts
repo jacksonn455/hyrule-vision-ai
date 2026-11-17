@@ -26,11 +26,23 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
     }
 }
 
+/** Windows briefly locks a file that an editor, antivirus or indexer is reading: the rename then fails. */
+const LOCKED_FILE_ERRORS = new Set(['EACCES', 'EPERM', 'EBUSY'])
+
 /** Write to a temp file then rename: an interrupted run never leaves a half-written JSON file behind. */
 async function writeJsonAtomic(file: string, data: unknown): Promise<void> {
     const temp = `${file}.tmp`
     await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
-    await rename(temp, file)
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await rename(temp, file)
+            return
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code ?? ''
+            if (!LOCKED_FILE_ERRORS.has(code) || attempt >= 10) throw error
+            await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
+        }
+    }
 }
 
 /**
@@ -43,10 +55,16 @@ export class MetadataStore {
     private readonly images: ImageRecord[]
     private readonly rejections: Rejection[]
 
+    /** URL lookups for big imports (tens of thousands of files): scanning the arrays per file would be quadratic. */
+    private readonly imageUrls = new Set<string>()
+    private readonly rejectionByUrl = new Map<string, Rejection>()
+
     private constructor(dir: string, images: ImageRecord[], rejections: Rejection[]) {
         this.dir = dir
         this.images = images
         this.rejections = rejections
+        for (const image of images) this.imageUrls.add(image.url)
+        for (const rejection of rejections) this.rejectionByUrl.set(rejection.url, rejection)
     }
 
     static async load(dir: string): Promise<MetadataStore> {
@@ -67,12 +85,13 @@ export class MetadataStore {
     }
 
     hasImage(url: string): boolean {
-        return this.images.some((image) => image.url === url)
+        return this.imageUrls.has(url)
     }
 
     /** True if the URL was refused for a reason that will not change by trying again. */
     isPermanentlyRejected(url: string): boolean {
-        return this.rejections.some((r) => r.url === url && !TRANSIENT_REJECTIONS.has(r.reason))
+        const rejection = this.rejectionByUrl.get(url)
+        return rejection !== undefined && !TRANSIENT_REJECTIONS.has(rejection.reason)
     }
 
     countByLabel(label: string): number {
@@ -82,12 +101,14 @@ export class MetadataStore {
     addImage(record: ImageRecord): void {
         this.removeRejection(record.url)
         this.images.push(record)
+        this.imageUrls.add(record.url)
     }
 
     /** Keeps only the latest rejection per URL, so retried URLs do not inflate the counts. */
     addRejection(rejection: Rejection): void {
         this.removeRejection(rejection.url)
         this.rejections.push(rejection)
+        this.rejectionByUrl.set(rejection.url, rejection)
     }
 
     findImage(path: string): ImageRecord | undefined {
@@ -109,6 +130,7 @@ export class MetadataStore {
         const index = this.images.findIndex((image) => image.path === path)
         if (index === -1) return undefined
         const [image] = this.images.splice(index, 1) as [ImageRecord]
+        if (!this.images.some((other) => other.url === image.url)) this.imageUrls.delete(image.url)
         this.addRejection({
             url: image.url,
             title: image.title,
@@ -127,7 +149,7 @@ export class MetadataStore {
      * can be collected. Rejections decided from the image itself or by a person are kept.
      */
     forgetPlanRejection(url: string): void {
-        const rejection = this.rejections.find((r) => r.url === url)
+        const rejection = this.rejectionByUrl.get(url)
         if (rejection && PLAN_REJECTIONS.has(rejection.reason)) this.removeRejection(url)
     }
 
@@ -144,7 +166,9 @@ export class MetadataStore {
     }
 
     private removeRejection(url: string): void {
-        const index = this.rejections.findIndex((r) => r.url === url)
-        if (index !== -1) this.rejections.splice(index, 1)
+        const rejection = this.rejectionByUrl.get(url)
+        if (!rejection) return
+        this.rejectionByUrl.delete(url)
+        this.rejections.splice(this.rejections.indexOf(rejection), 1)
     }
 }

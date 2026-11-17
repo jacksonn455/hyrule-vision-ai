@@ -36,9 +36,12 @@ export function evaluate(actual: number[], predicted: number[], labels: readonly
 /**
  * Weights that make every class count the same in the loss despite different image counts
  * (link has far more images than malon): weight = total / (classes * count).
+ * Capped at `max`: a class with 5 images among 30 000 would otherwise weigh ~300× and destabilise training.
  */
-export function classWeights(labelIndices: number[], numClasses: number): Record<number, number> {
+export function classWeights(labelIndices: number[], numClasses: number, max = 10): Record<number, number> {
     const counts = Array<number>(numClasses).fill(0)
     labelIndices.forEach((i) => counts[i]!++)
-    return Object.fromEntries(counts.map((c, i) => [i, c === 0 ? 0 : labelIndices.length / (numClasses * c)]))
+    return Object.fromEntries(
+        counts.map((c, i) => [i, c === 0 ? 0 : Math.min(max, labelIndices.length / (numClasses * c))]),
+    )
 }

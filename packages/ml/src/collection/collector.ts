@@ -32,6 +32,11 @@ export interface CollectOptions {
     overwrite?: boolean
     /** Called after each candidate with what happened to it (e.g. to build a per-file import summary). */
     onOutcome?: (candidate: ImageCandidate, outcome: Outcome) => void
+    /**
+     * Save the metadata after this many new outcomes (and once at the end). 1 by default, so a run can be stopped
+     * at any time. Big local imports use more: rewriting sources.json after every image gets slow.
+     */
+    saveEvery?: number
 }
 
 export type Outcome = 'kept' | 'skipped' | RejectionReason
@@ -56,16 +61,23 @@ export class DatasetCollector {
 
     async collect(candidates: readonly ImageCandidate[], options: CollectOptions): Promise<CollectSummary> {
         const summary: Partial<CollectSummary> = {}
+        const saveEvery = options.saveEvery ?? 1
+        let unsaved = 0
         for (const candidate of candidates) {
-            if (this.deps.store.countByLabel(candidate.label) >= options.targets[candidate.label]) continue
+            const target = options.targets[candidate.label]
+            if (target !== Infinity && this.deps.store.countByLabel(candidate.label) >= target) continue
             const outcome = await this.collectOne(candidate, options.overwrite ?? false)
             summary[outcome] = (summary[outcome] ?? 0) + 1
             options.onOutcome?.(candidate, outcome)
             if (outcome !== 'skipped') {
                 this.log(`${outcome.padEnd(16)} ${candidate.label}/${candidate.subcategory}  ${candidate.title}`)
-                await this.deps.store.save()
+                if (++unsaved >= saveEvery) {
+                    await this.deps.store.save()
+                    unsaved = 0
+                }
             }
         }
+        if (unsaved > 0) await this.deps.store.save()
         return summary as CollectSummary
     }
 
@@ -88,7 +100,13 @@ export class DatasetCollector {
         if (!validation.ok) return this.reject(candidate, validation.reason, validation.detail)
 
         const hash = sha256(buffer)
-        const pHash = await perceptualHash(buffer)
+        let pHash: string
+        try {
+            pHash = await perceptualHash(buffer)
+        } catch (error) {
+            // Some damaged JPEGs pass the header check but fail when fully decoded.
+            return this.reject(candidate, 'corrupted', (error as Error).message.split('\n')[0]!)
+        }
         const duplicate = index.findDuplicate(hash, pHash)
         if (duplicate) {
             const reason = duplicate.kind === 'exact' ? 'duplicate-exact' : 'duplicate-near'

@@ -18,7 +18,8 @@
     "sync-metadata": "node src/scripts/sync-metadata.ts",
     "split-dataset": "node src/scripts/split-dataset.ts",
     "train": "node src/scripts/train.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "web-search": "node src/scripts/web-search.ts"
   },
   "dependencies": {
     "@tensorflow/tfjs-node": "^4.22.0",

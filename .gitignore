@@ -24,8 +24,9 @@ data/raw/**
 data/inbox/**
 data/dataset/**
 data/sources/**
-data/cache/
-data/review/
+data/cache/**
+data/review/**
+data/metadata/imports/**
 !data/**/
 !data/**/.gitkeep
 
@@ -40,3 +41,7 @@ models/**
 *.webp
 *.bmp
 *.gif
+
+# Archives and in-progress training output
+*.zip
+models/*.training/

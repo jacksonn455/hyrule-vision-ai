@@ -26,6 +26,7 @@
     "ml:check-env": "npm run check-env -w @hyrule/ml",
     "ml:collect-dataset": "npm run collect-dataset -w @hyrule/ml --",
     "ml:import-images": "npm run import-images -w @hyrule/ml --",
+    "ml:web-search": "npm run web-search -w @hyrule/ml --",
     "ml:dataset-report": "npm run dataset-report -w @hyrule/ml",
     "ml:review-dataset": "npm run review-dataset -w @hyrule/ml --",
     "ml:reorganize-raw": "npm run reorganize-raw -w @hyrule/ml --",

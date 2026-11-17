@@ -30,6 +30,12 @@ describe('characterClasses', () => {
         })
     })
 
+    it('also reads characters the collector filed under other/<character>/', () => {
+        const { classes } = characterClasses([...paths, ...many('other/midna', 5), ...many('other/enemies', 2)], 10)
+        expect(classes.counts.midna).toBe(15)
+        expect(classes.counts.other).toBe(7)
+    })
+
     it('raising the threshold demotes a character to other', () => {
         expect(characterClasses(paths, 11).classes.labels).toEqual(['link', 'zelda', 'other'])
     })
@@ -44,6 +50,7 @@ describe('gameClasses', () => {
             ...many('link/unspecified', 50),
             ...many('link/nes', 3),
             ...many('midna', 30),
+            ...many('other/midna', 30),
         ]
         const { images, classes } = gameClasses(paths, 10)
         expect(classes.labels).toEqual(['wind-waker', 'ocarina-of-time'])

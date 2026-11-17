@@ -10,7 +10,6 @@ understand how each part of an image classifier works by building it.
 
 <img width="1042" height="658" alt="image" src="https://github.com/user-attachments/assets/e0b63612-3ec6-40a3-b3da-47f6db8a256f" />
 
-
 ## Stack
 
 | Layer            | Technology                                      |
@@ -68,6 +67,7 @@ npm run dev            # API on http://127.0.0.1:3333, web on http://localhost:5
 | `npm run ml:check-env`       | Runs a convolution on the native TF backend + Sharp test         |
 | `npm run ml:collect-dataset` | Downloads, validates and files the raw dataset (resumable)       |
 | `npm run ml:import-images`   | Imports images/sprite sheets saved by hand into `data/inbox`     |
+| `npm run ml:web-search`      | Bulk image search into `data/inbox` (private study, see below)   |
 | `npm run ml:review-dataset`  | Contact sheets for visual review / reject images                 |
 | `npm run ml:dataset-report`  | Writes `docs/research/DATASET-COLLECTION-REPORT.md`              |
 | `npm run ml:sync-metadata`   | Updates `sources.json` after moving/deleting files by hand       |
@@ -132,6 +132,17 @@ The classes are **not hard-coded**: they come from the folders in `data/raw`.
 
 ```bash
 npm run ml:split-dataset -- --min-images 15   # stricter: only characters with 15+ images get their own class
+```
+
+**Bulk web search (private study only).** `ml:web-search` downloads Bing Images results (SafeSearch strict) into
+`data/inbox/<link|zelda>/<game>/` and `data/inbox/other/<character>/`; `ml:import-images` then validates them, drops
+duplicates and files them in `data/raw`. The licence of these images is unknown: like everything in `data/`, they are
+git-ignored and must not be published. In-game screenshots work best, so run several passes with a suffix:
+
+```bash
+npm run ml:web-search -- --per-query 300 --suffix "gameplay screenshot"
+npm run ml:web-search -- --only midna,link/twilight-princess --suffix "cutscene screenshot"
+npm run ml:import-images && npm run ml:train:all
 ```
 
 ## API

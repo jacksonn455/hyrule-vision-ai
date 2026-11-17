@@ -22,4 +22,8 @@ describe('classWeights', () => {
     it('gives rarer classes a bigger weight', () => {
         expect(classWeights([0, 0, 0, 0, 1, 1], 3)).toEqual({ 0: 0.5, 1: 1, 2: 0 })
     })
+
+    it('caps the weight of very rare classes', () => {
+        expect(classWeights([...Array<number>(99).fill(0), 1], 2, 10)).toMatchObject({ 1: 10 })
+    })
 })

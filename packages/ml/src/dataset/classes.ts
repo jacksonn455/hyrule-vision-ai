@@ -50,6 +50,15 @@ function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
     return counts
 }
 
+/**
+ * The character an image belongs to: its top-level folder ("midna/x.jpg" → midna), or, for images the collector
+ * filed under the "other" collection label, the folder below it ("other/midna/x.jpg" → midna). Both layouts work.
+ */
+export function characterFolder(relativePath: string): string {
+    const parts = relativePath.toLowerCase().split('/')
+    return parts[0] === OTHER_LABEL && parts.length > 2 ? parts[1]! : parts[0]!
+}
+
 /** Most images first (ties alphabetical): a stable, readable output order. */
 function byCountDesc(counts: Map<string, number>): string[] {
     return [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b))
@@ -62,8 +71,7 @@ function byCountDesc(counts: Map<string, number>): string[] {
  * split-dataset + train: once it reaches `minImages` it becomes a class of its own.
  */
 export function characterClasses(relativePaths: string[], minImages = DEFAULT_MIN_IMAGES) {
-    const top = (p: string) => p.split('/')[0]!.toLowerCase()
-    const counts = countBy(relativePaths, top)
+    const counts = countBy(relativePaths, characterFolder)
     const characters = byCountDesc(counts).filter(
         (folder) => !NON_CHARACTER_FOLDERS.has(folder) && counts.get(folder)! >= minImages,
     )
@@ -74,7 +82,7 @@ export function characterClasses(relativePaths: string[], minImages = DEFAULT_MI
     )
     const isClass = new Set(characters)
     const images: LabeledImage[] = relativePaths.map((relativePath) => {
-        const folder = top(relativePath)
+        const folder = characterFolder(relativePath)
         return {
             relativePath,
             label: isClass.has(folder) ? folder : OTHER_LABEL,
@@ -101,7 +109,13 @@ export function characterClasses(relativePaths: string[], minImages = DEFAULT_MI
 export function gameClasses(relativePaths: string[], minImages = DEFAULT_MIN_IMAGES) {
     const candidates = relativePaths
         .map((relativePath) => relativePath.split('/'))
-        .filter((parts) => parts.length === 3 && parts[1]!.toLowerCase() !== UNKNOWN_GAME)
+        // Only real characters have game sub-folders ("other/midna/x.jpg" is a character, not a game).
+        .filter(
+            (parts) =>
+                parts.length === 3 &&
+                !NON_CHARACTER_FOLDERS.has(parts[0]!.toLowerCase()) &&
+                parts[1]!.toLowerCase() !== UNKNOWN_GAME,
+        )
         .map((parts) => ({
             relativePath: parts.join('/'),
             character: parts[0]!.toLowerCase(),

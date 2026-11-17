@@ -25,47 +25,75 @@ export async function readTaskClasses(task: Task): Promise<TaskClasses> {
     }
 }
 
+export const PIXELS_PER_IMAGE = IMAGE_SIZE * IMAGE_SIZE * IMAGE_CHANNELS
+
 export interface LoadedSplit {
-    /** [n, IMAGE_SIZE, IMAGE_SIZE, 3] images in [0, 1]. */
-    xs: tf.Tensor4D
-    /** [n, classes] one-hot labels, column order = `labels` passed to loadSplit. */
-    ys: tf.Tensor2D
+    /**
+     * Every image as RGB bytes, one after another (n × 96 × 96 × 3). Bytes, not floats: 30 000 images are ~830 MB
+     * as bytes but 3.3 GB as float32, which does not fit in memory. `toTensors` converts a few thousand at a time.
+     */
+    pixels: Uint8Array
     /** Class index of every image (position in `labels`). */
     indices: number[]
     files: string[]
+    numClasses: number
 }
 
-/**
- * Loads a whole split into memory. ~1000 images x 96x96x3 floats ≈ 110 MB, so batching from disk is unnecessary:
- * model.fit() still feeds the network in mini-batches (`batchSize`). Unreadable images are skipped, not fatal.
- */
+/** Decodes images with a few sharp calls in flight (sharp works on its own threads). */
+async function decodeAll(files: string[], concurrency = 8): Promise<(Uint8Array | null)[]> {
+    const out: (Uint8Array | null)[] = Array.from({ length: files.length }, () => null)
+    let next = 0
+    await Promise.all(
+        Array.from({ length: concurrency }, async () => {
+            while (next < files.length) {
+                const i = next++
+                try {
+                    out[i] = await imageToPixels(files[i]!)
+                } catch (error) {
+                    console.warn(`skipping unreadable ${files[i]}: ${(error as Error).message}`)
+                }
+            }
+        }),
+    )
+    return out
+}
+
+/** Loads a whole split as bytes. Unreadable images are skipped, not fatal. */
 export async function loadSplit(task: Task, split: DatasetSplit, labels: readonly string[]): Promise<LoadedSplit> {
-    const pixels: Uint8Array[] = []
-    const indices: number[] = []
-    const files: string[] = []
+    const candidates: { file: string; index: number }[] = []
     for (const [index, label] of labels.entries()) {
         const dir = datasetClassDir(task, split, label)
         const names = await readdir(dir).catch(() => [] as string[])
-        for (const name of names.filter(hasAllowedExtension).sort()) {
-            const file = path.join(dir, name)
-            try {
-                pixels.push(await imageToPixels(file))
-                indices.push(index)
-                files.push(file)
-            } catch (error) {
-                console.warn(`skipping unreadable ${file}: ${(error as Error).message}`)
-            }
-        }
+        for (const name of names.filter(hasAllowedExtension).sort())
+            candidates.push({ file: path.join(dir, name), index })
     }
-    const size = IMAGE_SIZE * IMAGE_SIZE * IMAGE_CHANNELS
-    const all = new Uint8Array(pixels.length * size)
-    pixels.forEach((p, i) => all.set(p, i * size))
+    const decoded = await decodeAll(candidates.map((c) => c.file))
+    const kept = candidates.map((c, i) => ({ ...c, pixels: decoded[i] })).filter((c) => c.pixels)
+    const pixels = new Uint8Array(kept.length * PIXELS_PER_IMAGE)
+    kept.forEach((c, i) => pixels.set(c.pixels!, i * PIXELS_PER_IMAGE))
+    return { pixels, indices: kept.map((c) => c.index), files: kept.map((c) => c.file), numClasses: labels.length }
+}
+
+/** Images at `positions` (indexes into the split) → [n, 96, 96, 3] floats in [0, 1] and [n, classes] one-hot labels. */
+export function toTensors(split: LoadedSplit, positions: readonly number[]): { xs: tf.Tensor4D; ys: tf.Tensor2D } {
+    const bytes = new Uint8Array(positions.length * PIXELS_PER_IMAGE)
+    positions.forEach((p, i) =>
+        bytes.set(split.pixels.subarray(p * PIXELS_PER_IMAGE, (p + 1) * PIXELS_PER_IMAGE), i * PIXELS_PER_IMAGE),
+    )
     const xs = tf.tidy(() =>
         tf
-            .tensor4d(all, [pixels.length, IMAGE_SIZE, IMAGE_SIZE, IMAGE_CHANNELS], 'int32')
+            .tensor4d(bytes, [positions.length, IMAGE_SIZE, IMAGE_SIZE, IMAGE_CHANNELS], 'int32')
             .toFloat()
             .div<tf.Tensor4D>(255),
     )
-    const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(indices, 'int32'), labels.length).toFloat()) as tf.Tensor2D
-    return { xs, ys, indices, files }
+    const labels = positions.map((p) => split.indices[p]!)
+    const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(labels, 'int32'), split.numClasses).toFloat() as tf.Tensor2D)
+    return { xs, ys }
+}
+
+/** Splits 0..n-1 (in the given order) into groups of at most `size`. */
+export function chunks(order: readonly number[], size: number): number[][] {
+    const out: number[][] = []
+    for (let i = 0; i < order.length; i += size) out.push(order.slice(i, i + size))
+    return out
 }

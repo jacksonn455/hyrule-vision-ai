@@ -186,6 +186,7 @@ const unlimited = Object.fromEntries(COLLECTION_LABELS.map((l) => [l, Infinity])
 await collector.collect(candidates, {
     targets: unlimited,
     onOutcome: (candidate, outcome) => results.push({ candidate, outcome }),
+    saveEvery: 500,
 })
 await store.save()
 
@@ -220,6 +221,8 @@ for (const { outcome } of results) {
         rejectedReasons.set(outcome, (rejectedReasons.get(outcome) ?? 0) + 1)
     }
 }
+const savedAs = new Map(store.allImages().map((i) => [i.url, i.path]))
+const rejectionDetail = new Map(store.allRejections().map((r) => [r.url, r.detail]))
 const summary = {
     importedAt: new Date().toISOString(),
     files: inputs.length,
@@ -231,8 +234,8 @@ const summary = {
     details: results.map(({ candidate, outcome }) => ({
         file: candidate.originalFilename,
         outcome,
-        savedAs: store.allImages().find((i) => i.url === candidate.url)?.path,
-        detail: store.allRejections().find((r) => r.url === candidate.url)?.detail,
+        savedAs: savedAs.get(candidate.url),
+        detail: rejectionDetail.get(candidate.url),
     })),
 }
 const summaryFile = path.join(METADATA_DIR, 'imports', `${summary.importedAt.replace(/[:.]/g, '-')}.json`)
