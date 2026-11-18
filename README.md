@@ -8,8 +8,8 @@ first with a CNN trained from scratch (to learn how each part works), then with 
 > **Status:** dataset of ~44 000 images, automatic cleaning, two models (12 characters: **81.4%**, 9 games:
 > **66.0%** test accuracy), inference API, upload UI and live webcam mode. See [Results](#results).
 
+<img width="883" height="1755" alt="image" src="https://github.com/user-attachments/assets/d6472ece-ee9f-43b0-a84c-5b65007b1897" />
 <img width="909" height="1608" alt="image" src="https://github.com/user-attachments/assets/87feda96-264f-4e5d-866a-786cc9d63f2d" />
-<img width="887" height="1579" alt="image" src="https://github.com/user-attachments/assets/2f095f38-0467-4a6d-9dc5-7a9965f66e20" />
 <img width="886" height="1574" alt="image" src="https://github.com/user-attachments/assets/2ce00688-2e28-49f2-8969-6a6474b583ba" />
 <img width="878" height="1514" alt="image" src="https://github.com/user-attachments/assets/c0f5715b-6c96-457b-a569-412826917724" />
 
