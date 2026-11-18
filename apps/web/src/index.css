@@ -214,3 +214,29 @@ h2 {
 .badge--muted {
     color: var(--muted);
 }
+
+/* Live webcam */
+.webcam video,
+.webcam-placeholder {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    background: #000;
+    object-fit: contain;
+}
+
+.webcam-placeholder {
+    display: grid;
+    place-items: center;
+}
+
+.webcam button {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--surface);
+    font: inherit;
+    cursor: pointer;
+}

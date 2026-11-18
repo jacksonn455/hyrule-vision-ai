@@ -5,6 +5,7 @@ import { ApiStatus } from './components/ApiStatus.tsx'
 import { ImageUploader } from './components/ImageUploader.tsx'
 import { ResultsPanel, type ClassificationState } from './components/ResultsPanel.tsx'
 import { TrainedClasses } from './components/TrainedClasses.tsx'
+import { WebcamClassifier } from './components/WebcamClassifier.tsx'
 import { useApiHealth } from './hooks/useApiHealth.ts'
 
 export function App() {
@@ -41,6 +42,9 @@ export function App() {
             <div className="grid">
                 <ImageUploader file={file} onFileSelected={handleFileSelected} />
                 <ResultsPanel state={classification} labels={health.status === 'online' ? health.health.labels : []} />
+            </div>
+            <div className="grid">
+                <WebcamClassifier labels={health.status === 'online' ? health.health.labels : []} />
             </div>
             {health.status === 'online' && health.health.model && (
                 <div className="grid">
