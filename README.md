@@ -194,7 +194,14 @@ Malon and Fi.
 and 278 game images that a model which never saw them classified as another class with ≥ 90% confidence were moved
 to `data/review/suspects/` (not deleted), then the dataset was re-split and both models retrained.
 
-Per-character test recall (`sqrt`, after cleaning): link 82%, sidon 69%, mipha 69%, revali 68%, midna 67%,
+**12 characters, no "other" (current model, 2026-11-18): test accuracy 81.4%** (chance 8.3%). The 8 characters
+below 50% recall (zelda, impa, tingle, paya, malon, fi, zant, riju) are left out (`EXCLUDED_CHARACTERS` in
+[classes.ts](packages/ml/src/dataset/classes.ts)), and so is the "other" class (`INCLUDE_OTHER`): its images (objects,
+enemies, small characters) were too varied to be one class. The model now always answers one of the 12 characters.
+Their images stay in `data/raw`; Zelda's game folders still feed the game model. Recall: link 91%, sidon 70%, mipha
+70%, daruk 70%, midna 64%, skull-kid 64%, revali 63%, urbosa 63%, ganondorf 61%, purah 57%, saria 56%, ghirahim 55%.
+
+Per-character test recall of the 21-class model (`sqrt`, after cleaning): link 82%, sidon 69%, mipha 69%, revali 68%, midna 67%,
 daruk 65%, skull-kid 61%, ghirahim 60%, urbosa 58%, purah 57%, saria 54%, ganondorf 53%, riju 48%, zant 43%, fi 40%,
 zelda 31%, impa 28%, paya 27%, malon 27%, tingle 25%.
 

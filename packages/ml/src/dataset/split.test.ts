@@ -9,7 +9,7 @@ describe('stratifiedSplit', () => {
         ...Array.from({ length: 20 }, (_, i) => `zelda/tp/${i}.jpg`),
         ...Array.from({ length: 2 }, (_, i) => `ravio/${i}.jpg`),
     ]
-    const { images } = characterClasses(paths)
+    const { images } = characterClasses(paths, 10, new Set(), true)
 
     it('splits every folder 70/15/15, keeps tiny folders in train, loses nothing', () => {
         const split = stratifiedSplit(images)

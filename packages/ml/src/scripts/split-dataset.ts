@@ -65,4 +65,7 @@ for (const task of TASKS) {
         const verb = task === 'characters' ? 'merged into "other"' : 'skipped'
         console.log(`below ${minImages} images, ${verb}:`, classes.belowThreshold)
     }
+    if (classes.excluded && Object.keys(classes.excluded).length > 0) {
+        console.log('left out on purpose (EXCLUDED_CHARACTERS in classes.ts):', classes.excluded)
+    }
 }

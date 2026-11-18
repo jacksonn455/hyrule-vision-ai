@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { characterClasses, gameClasses } from './classes.ts'
 
+const none = new Set<string>()
 const many = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}/${i}.jpg`)
 
 describe('characterClasses', () => {
@@ -15,14 +16,14 @@ describe('characterClasses', () => {
     ]
 
     it('turns every character folder with enough images into a class, most images first, other last', () => {
-        const { classes } = characterClasses(paths, 10)
+        const { classes } = characterClasses(paths, 10, none, true)
         expect(classes.labels).toEqual(['link', 'zelda', 'midna', 'other'])
         expect(classes.counts).toEqual({ link: 15, zelda: 12, midna: 10, other: 5 })
         expect(classes.belowThreshold).toEqual({ ravio: 2 })
     })
 
     it('merges small characters and non-character folders into other', () => {
-        const { images } = characterClasses(paths, 10)
+        const { images } = characterClasses(paths, 10, none, true)
         expect(images.find((i) => i.relativePath === 'ravio/0.jpg')).toMatchObject({ label: 'other', group: 'ravio' })
         expect(images.find((i) => i.relativePath === 'link/wind-waker/0.jpg')).toMatchObject({
             label: 'link',
@@ -31,13 +32,32 @@ describe('characterClasses', () => {
     })
 
     it('also reads characters the collector filed under other/<character>/', () => {
-        const { classes } = characterClasses([...paths, ...many('other/midna', 5), ...many('other/enemies', 2)], 10)
+        const { classes } = characterClasses(
+            [...paths, ...many('other/midna', 5), ...many('other/enemies', 2)],
+            10,
+            none,
+            true,
+        )
         expect(classes.counts.midna).toBe(15)
         expect(classes.counts.other).toBe(7)
     })
 
     it('raising the threshold demotes a character to other', () => {
-        expect(characterClasses(paths, 11).classes.labels).toEqual(['link', 'zelda', 'other'])
+        expect(characterClasses(paths, 11, none, true).classes.labels).toEqual(['link', 'zelda', 'other'])
+    })
+
+    it('leaves excluded characters out entirely (not even in other)', () => {
+        const { classes, images } = characterClasses(paths, 10, new Set(['zelda']), true)
+        expect(classes.labels).toEqual(['link', 'midna', 'other'])
+        expect(classes.counts.other).toBe(5)
+        expect(classes.excluded).toEqual({ zelda: 12 })
+        expect(images.some((i) => i.relativePath.startsWith('zelda/'))).toBe(false)
+    })
+
+    it('without other, drops small characters and non-character folders', () => {
+        const { classes, images } = characterClasses(paths, 10, none, false)
+        expect(classes.labels).toEqual(['link', 'zelda', 'midna'])
+        expect(images).toHaveLength(37)
     })
 })
 

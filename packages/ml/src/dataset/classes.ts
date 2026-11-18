@@ -15,6 +15,21 @@ export const NON_CHARACTER_FOLDERS = new Set([
     'other-characters',
 ])
 
+/**
+ * Characters left out of the character model: below 50% test recall after the cleaning of 2026-11-18 (web images
+ * too noisy, or too often in the same picture as Link). Their images stay in data/raw, are not merged into "other"
+ * (they would teach "other" to look like a character), and Link/Zelda game folders still feed the game model.
+ * Remove a name from here (and re-run split-dataset + train) to bring it back.
+ */
+export const EXCLUDED_CHARACTERS = new Set(['zelda', 'impa', 'tingle', 'paya', 'malon', 'fi', 'zant', 'riju'])
+
+/**
+ * Whether the character model has an "other" class (small characters, objects, enemies…). Off since 2026-11-18: those
+ * images are too varied to be learned as one class and only blurred the real characters. The model now always answers
+ * one of the trained characters.
+ */
+export const INCLUDE_OTHER = false
+
 /** Game sub-folder that means "game unknown": useless for the game model. */
 export const UNKNOWN_GAME = 'unspecified'
 
@@ -42,6 +57,8 @@ export interface TaskClasses {
     belowThreshold: Record<string, number>
     /** games: characters whose per-game folders were used. */
     characters: string[]
+    /** characters: folders left out on purpose (EXCLUDED_CHARACTERS), with their image counts. */
+    excluded?: Record<string, number>
 }
 
 function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
@@ -70,7 +87,17 @@ function byCountDesc(counts: Map<string, number>): string[] {
  * still useful as examples of "not one of the known characters". Add images to a folder and re-run
  * split-dataset + train: once it reaches `minImages` it becomes a class of its own.
  */
-export function characterClasses(relativePaths: string[], minImages = DEFAULT_MIN_IMAGES) {
+export function characterClasses(
+    allPaths: string[],
+    minImages = DEFAULT_MIN_IMAGES,
+    excludedCharacters: ReadonlySet<string> = EXCLUDED_CHARACTERS,
+    includeOther = INCLUDE_OTHER,
+) {
+    const excluded = countBy(
+        allPaths.filter((p) => excludedCharacters.has(characterFolder(p))),
+        characterFolder,
+    )
+    const relativePaths = allPaths.filter((p) => !excludedCharacters.has(characterFolder(p)))
     const counts = countBy(relativePaths, characterFolder)
     const characters = byCountDesc(counts).filter(
         (folder) => !NON_CHARACTER_FOLDERS.has(folder) && counts.get(folder)! >= minImages,
@@ -81,14 +108,16 @@ export function characterClasses(relativePaths: string[], minImages = DEFAULT_MI
             .map((folder) => [folder, counts.get(folder)!]),
     )
     const isClass = new Set(characters)
-    const images: LabeledImage[] = relativePaths.map((relativePath) => {
-        const folder = characterFolder(relativePath)
-        return {
-            relativePath,
-            label: isClass.has(folder) ? folder : OTHER_LABEL,
-            group: relativePath.split('/').slice(0, -1).join('/') || folder,
-        }
-    })
+    const images: LabeledImage[] = relativePaths
+        .map((relativePath) => {
+            const folder = characterFolder(relativePath)
+            return {
+                relativePath,
+                label: isClass.has(folder) ? folder : OTHER_LABEL,
+                group: relativePath.split('/').slice(0, -1).join('/') || folder,
+            }
+        })
+        .filter((image) => includeOther || image.label !== OTHER_LABEL)
     const labels = images.some((image) => image.label === OTHER_LABEL) ? [...characters, OTHER_LABEL] : characters
     const classes: TaskClasses = {
         task: 'characters',
@@ -97,6 +126,7 @@ export function characterClasses(relativePaths: string[], minImages = DEFAULT_MI
         counts: Object.fromEntries(countBy(images, (i) => i.label)),
         belowThreshold,
         characters: [],
+        excluded: Object.fromEntries(byCountDesc(excluded).map((folder) => [folder, excluded.get(folder)!])),
     }
     return { images, classes }
 }
