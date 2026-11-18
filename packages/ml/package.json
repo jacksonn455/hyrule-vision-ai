@@ -19,6 +19,7 @@
     "split-dataset": "node src/scripts/split-dataset.ts",
     "train": "node src/scripts/train.ts",
     "train:transfer": "node src/scripts/train-transfer.ts",
+    "find-suspects": "node src/scripts/find-suspects.ts",
     "typecheck": "tsc -p tsconfig.json",
     "web-search": "node src/scripts/web-search.ts"
   },

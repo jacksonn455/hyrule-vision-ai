@@ -71,6 +71,7 @@ npm run dev            # API on http://127.0.0.1:3333, web on http://localhost:5
 | `npm run ml:review-dataset`       | Contact sheets for visual review / reject images                         |
 | `npm run ml:dataset-report`       | Writes `docs/research/DATASET-COLLECTION-REPORT.md`                      |
 | `npm run ml:sync-metadata`        | Updates `sources.json` after moving/deleting files by hand               |
+| `npm run ml:find-suspects`        | Moves likely mislabelled images to `data/review/suspects` (k-fold)       |
 | `npm run ml:split-dataset`        | Discovers classes, stratified 70/15/15 split into `data/dataset`         |
 | `npm run ml:train:transfer`       | Character model, MobileNet transfer learning → `models/hyrule-cnn`       |
 | `npm run ml:train:transfer:games` | Game model (Link / Zelda), transfer learning → `models/hyrule-cnn-games` |
@@ -177,20 +178,25 @@ every run; the test images are never used to choose settings (validation is).
 | MobileNet + classifier, `balanced` class weights       | 33%             | 35.9%         |
 | MobileNet + classifier, `sqrt` class weights (default) | 60.0%           | **58.6%**     |
 | MobileNet + classifier, no class weights               | 61.6%           | 60.7%         |
+| MobileNet `sqrt`, after `ml:find-suspects` cleaning    | —               | **60.4%**     |
 
 `balanced` weights made the model avoid Link and Zelda (63% of the images): their recall fell to ~20%. Without
 weights it answers "Link" too often (93% Link recall, 9% for Malon and Paya). `sqrt` is the default: almost the same
 accuracy, much better for the small characters. Weakest classes: Zelda (often in the same picture as Link), Paya,
-Malon and Fi. Web images are noisy (fan art, cosplay, group pictures); reviewing them is the next lever.
+Malon and Fi.
 
-Per-character test recall (`sqrt`): link 82%, mipha 69%, ganondorf 68%, daruk 64%, midna 63%, revali 63%,
-sidon 62%, ghirahim 62%, skull-kid 60%, purah 55%, urbosa 52%, saria 44%, riju 41%, zant 40%, fi 33%, zelda 25%,
-tingle 25%, impa 23%, malon 20%, paya 12%.
+**Automatic cleaning** (`npm run ml:find-suspects`, 5-fold out-of-fold predictions, threshold 90%): 252 character
+and 278 game images that a model which never saw them classified as another class with ≥ 90% confidence were moved
+to `data/review/suspects/` (not deleted), then the dataset was re-split and both models retrained.
 
-**Game model (Link + Zelda, 9 games, chance 11.1%):** MobileNet + classifier, test accuracy **64.8%** (validation
-65.8%), up from 50% on 4 games with the CNN from scratch. Recall: Twilight Princess 77%, Wind Waker 72%, Skyward
-Sword 71%, NES 70%, Tears of the Kingdom 68%, Majora's Mask 64%, A Link to the Past 58%, Breath of the Wild 56%,
-Ocarina of Time 53%. BotW and TotK share an art style and are often confused with each other.
+Per-character test recall (`sqrt`, after cleaning): link 82%, sidon 69%, mipha 69%, revali 68%, midna 67%,
+daruk 65%, skull-kid 61%, ghirahim 60%, urbosa 58%, purah 57%, saria 54%, ganondorf 53%, riju 48%, zant 43%, fi 40%,
+zelda 31%, impa 28%, paya 27%, malon 27%, tingle 25%.
+
+**Game model (Link + Zelda, 9 games, chance 11.1%):** MobileNet + classifier, test accuracy **66.0%** after cleaning
+(64.8% before), up from 50% on 4 games with the CNN from scratch. Recall: Twilight Princess 78%, NES 77%, Wind Waker
+73%, Skyward Sword 66%, Majora's Mask 65%, Tears of the Kingdom 64%, Ocarina of Time 60%, A Link to the Past 58%,
+Breath of the Wild 58%. BotW and TotK share an art style and are often confused with each other.
 
 Earlier runs, before the bulk web search (CNN from scratch):
 

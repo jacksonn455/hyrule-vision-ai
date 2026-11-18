@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import type tf from '@tensorflow/tfjs-node'
@@ -9,7 +9,93 @@ import { imageToPixels } from '../preprocessing.ts'
 import { listSplit } from './load.ts'
 
 const FEATURE_CACHE_DIR = path.join(DATA_DIR, 'cache', 'features')
+const STORE_BIN = path.join(FEATURE_CACHE_DIR, `${FEATURE_EXTRACTOR.name}.bin`)
+const STORE_INDEX = path.join(FEATURE_CACHE_DIR, `${FEATURE_EXTRACTOR.name}.json`)
 const BATCH = 32
+const DIM = FEATURE_EXTRACTOR.features
+
+/**
+ * MobileNet features of every image ever seen, keyed by file name (data/raw names are unique: they contain the
+ * image hash), in data/cache/features/. Running MobileNet is the slow part (~25 images/s on CPU), so each image is
+ * processed once: re-splitting the dataset, moving an image to another folder or adding a few images only extracts
+ * what is new.
+ */
+export class FeatureStore {
+    private readonly rows: Map<string, number>
+    private features: Float32Array
+
+    private constructor(rows: Map<string, number>, features: Float32Array) {
+        this.rows = rows
+        this.features = features
+    }
+
+    static async open(): Promise<FeatureStore> {
+        await mkdir(FEATURE_CACHE_DIR, { recursive: true })
+        const names = await readFile(STORE_INDEX, 'utf8')
+            .then((text) => JSON.parse(text) as string[])
+            .catch(() => [] as string[])
+        const buffer = await readFile(STORE_BIN).catch(() => Buffer.alloc(0))
+        const features = new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+        // A run interrupted between the two writes leaves extra rows or names: keep only complete pairs.
+        const complete = Math.min(names.length, features.length / DIM)
+        const rows = new Map(names.slice(0, complete).map((name, row) => [name, row]))
+        return new FeatureStore(rows, features.subarray(0, complete * DIM))
+    }
+
+    has(file: string): boolean {
+        return this.rows.has(path.basename(file))
+    }
+
+    get(file: string): Float32Array {
+        const row = this.rows.get(path.basename(file))
+        if (row === undefined) throw new Error(`no features for ${file}`)
+        return this.features.subarray(row * DIM, (row + 1) * DIM)
+    }
+
+    /** Extracts the features of the files not in the store yet. Returns the files that could not be read. */
+    async add(files: readonly string[], extractor: () => Promise<tf.GraphModel>): Promise<Set<string>> {
+        const missing = [...new Set(files.filter((f) => !this.has(f)))]
+        const unreadable = new Set<string>()
+        if (missing.length === 0) return unreadable
+        console.log(`Extracting MobileNet features of ${missing.length} new images…`)
+        const model = await extractor()
+        const size = FEATURE_EXTRACTOR.inputSize
+        const bytesPerImage = size * size * 3
+        const started = Date.now()
+        const newRows: Float32Array[] = []
+        for (let start = 0; start < missing.length; start += BATCH) {
+            const batch = missing.slice(start, start + BATCH)
+            const decoded = await Promise.all(batch.map((f) => imageToPixels(f, size).catch(() => null)))
+            const kept = batch.filter((f, i) => (decoded[i] ? true : (unreadable.add(f), false)))
+            if (kept.length > 0) {
+                const pixels = new Uint8Array(kept.length * bytesPerImage)
+                decoded.filter((d) => d).forEach((d, i) => pixels.set(d!, i * bytesPerImage))
+                const output = extractFeatures(model, pixels, kept.length)
+                const values = new Float32Array(await output.data())
+                output.dispose()
+                // Rows first, then names: an interrupted run never has a name without its features.
+                await appendFile(STORE_BIN, new Uint8Array(values.buffer))
+                const firstRow = this.rows.size
+                kept.forEach((f, i) => this.rows.set(path.basename(f), firstRow + i))
+                await writeFile(STORE_INDEX, JSON.stringify([...this.rows.keys()]))
+                newRows.push(values)
+            }
+            if ((start / BATCH) % 100 === 0 && start > 0) {
+                const perSecond = start / ((Date.now() - started) / 1000)
+                console.log(`  ${start}/${missing.length} (${perSecond.toFixed(0)} images/s)`)
+            }
+        }
+        const merged = new Float32Array(this.features.length + newRows.reduce((n, r) => n + r.length, 0))
+        merged.set(this.features)
+        let offset = this.features.length
+        for (const r of newRows) {
+            merged.set(r, offset)
+            offset += r.length
+        }
+        this.features = merged
+        return unreadable
+    }
+}
 
 export interface FeatureSplit {
     /** [count × 1280] MobileNet features, one image after another. */
@@ -19,91 +105,29 @@ export interface FeatureSplit {
     files: string[]
 }
 
-interface FeatureManifest {
-    extractor: string
-    labels: readonly string[]
-    /** Every listed file, readable or not, so a changed split is detected. */
-    listed: string[]
-    files: string[]
-    indices: number[]
+/** Features of the given images (extracting the new ones), packed for training. Unreadable images are skipped. */
+export async function featuresOf(
+    store: FeatureStore,
+    images: readonly { file: string; index: number }[],
+    extractor: () => Promise<tf.GraphModel>,
+): Promise<FeatureSplit> {
+    const unreadable = await store.add(
+        images.map((i) => i.file),
+        extractor,
+    )
+    const kept = images.filter((i) => !unreadable.has(i.file))
+    const features = new Float32Array(kept.length * DIM)
+    kept.forEach((image, i) => features.set(store.get(image.file), i * DIM))
+    return { features, indices: kept.map((i) => i.index), files: kept.map((i) => i.file) }
 }
 
-/**
- * MobileNet features of every image of a split. Running MobileNet is the slow part (a few minutes per 10 000
- * images on CPU), so the features are computed once and kept in data/cache/features/<task>-<split>.bin; later
- * trainings read them in a second. The cache is rebuilt when the split or the extractor changes.
- */
+/** Features of every image of a split of data/dataset/<task>. */
 export async function loadFeatures(
+    store: FeatureStore,
     task: Task,
     split: DatasetSplit,
     labels: readonly string[],
-    extractor: tf.GraphModel,
+    extractor: () => Promise<tf.GraphModel>,
 ): Promise<FeatureSplit> {
-    const candidates = await listSplit(task, split, labels)
-    await mkdir(FEATURE_CACHE_DIR, { recursive: true })
-    const binFile = path.join(FEATURE_CACHE_DIR, `${task}-${split}.bin`)
-    const manifestFile = path.join(FEATURE_CACHE_DIR, `${task}-${split}.json`)
-    const listed = candidates.map((c) => path.relative(DATA_DIR, c.file))
-
-    const manifest = await readFile(manifestFile, 'utf8')
-        .then((text) => JSON.parse(text) as FeatureManifest)
-        .catch(() => null)
-    if (
-        manifest &&
-        manifest.extractor === FEATURE_EXTRACTOR.name &&
-        JSON.stringify(manifest.labels) === JSON.stringify(labels) &&
-        JSON.stringify(manifest.listed) === JSON.stringify(listed)
-    ) {
-        return { features: await readFloats(binFile), indices: manifest.indices, files: manifest.files }
-    }
-
-    console.log(`Extracting MobileNet features of ${split} (${candidates.length} images)…`)
-    const size = FEATURE_EXTRACTOR.inputSize
-    const bytesPerImage = size * size * 3
-    const handle = await open(binFile, 'w')
-    const files: string[] = []
-    const indices: number[] = []
-    const started = Date.now()
-    try {
-        for (let start = 0; start < candidates.length; start += BATCH) {
-            const batch = candidates.slice(start, start + BATCH)
-            const decoded = await Promise.all(
-                batch.map((c) =>
-                    imageToPixels(c.file, size).catch((error: Error) => {
-                        console.warn(`skipping unreadable ${c.file}: ${error.message}`)
-                        return null
-                    }),
-                ),
-            )
-            const kept = batch.filter((_, i) => decoded[i])
-            if (kept.length === 0) continue
-            const pixels = new Uint8Array(kept.length * bytesPerImage)
-            decoded.filter((d) => d).forEach((d, i) => pixels.set(d!, i * bytesPerImage))
-            const output = extractFeatures(extractor, pixels, kept.length)
-            const values = (await output.data()) as Float32Array
-            output.dispose()
-            await handle.write(new Uint8Array(values.buffer, values.byteOffset, values.byteLength))
-            for (const c of kept) {
-                files.push(c.file)
-                indices.push(c.index)
-            }
-            if ((start / BATCH) % 100 === 0) {
-                const perSecond = start / ((Date.now() - started) / 1000 || 1)
-                console.log(`  ${start}/${candidates.length} (${perSecond.toFixed(0)} images/s)`)
-            }
-        }
-    } finally {
-        await handle.close()
-    }
-    await writeFile(
-        manifestFile,
-        JSON.stringify({ extractor: FEATURE_EXTRACTOR.name, labels, listed, files, indices } satisfies FeatureManifest),
-    )
-    return { features: await readFloats(binFile), indices, files }
-}
-
-/** A Float32Array needs a 4-byte aligned buffer: copy instead of viewing the (possibly pooled) Buffer. */
-async function readFloats(file: string): Promise<Float32Array> {
-    const buffer = await readFile(file)
-    return new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+    return featuresOf(store, await listSplit(task, split, labels), extractor)
 }

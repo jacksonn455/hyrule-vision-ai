@@ -11,10 +11,11 @@ import { parseArgs } from 'node:util'
 
 import tf from '@tensorflow/tfjs-node'
 
-import { loadFeatures } from '../dataset/features.ts'
+import { FeatureStore, loadFeatures } from '../dataset/features.ts'
 import { readTaskClasses } from '../dataset/load.ts'
 import { FEATURE_EXTRACTOR, loadFeatureExtractor } from '../feature-extractor.ts'
-import { classWeights, evaluate } from '../metrics.ts'
+import { evaluate } from '../metrics.ts'
+import { WEIGHT_MODES, type WeightMode, buildTransferHead, featureTensors, weightsFor } from '../transfer-head.ts'
 import { LABELS_FILE, METRICS_FILE, type ModelMetricsFile } from '../model-files.ts'
 import { MODEL_DIRS, TASKS, type Task } from '../paths.ts'
 
@@ -24,17 +25,13 @@ const { values } = parseArgs({
         epochs: { type: 'string', default: '200' },
         'batch-size': { type: 'string', default: '64' },
         patience: { type: 'string', default: '15' },
-        /**
-         * How much rare classes are boosted in the loss. balanced: every class counts the same (good recall for
-         * small characters, but the big ones — Link, Zelda — get under-predicted). sqrt: half-way. none: as-is.
-         */
+        /** Class weights: balanced | sqrt | none (see transfer-head.ts). */
         weights: { type: 'string', default: 'sqrt' },
         /** Write the model somewhere else (e.g. to compare settings without replacing the API's model). */
         out: { type: 'string' },
     },
 })
-const WEIGHT_MODES = ['balanced', 'sqrt', 'none'] as const
-const weightMode = values.weights as (typeof WEIGHT_MODES)[number]
+const weightMode = values.weights as WeightMode
 if (!WEIGHT_MODES.includes(weightMode)) throw new Error(`--weights must be one of: ${WEIGHT_MODES.join(', ')}`)
 const task = values.task as Task
 if (!TASKS.includes(task)) throw new Error(`--task must be one of: ${TASKS.join(', ')}`)
@@ -46,44 +43,29 @@ const { labels } = classes
 if (labels.length < 2) throw new Error(`${task}: need at least 2 classes, found ${labels.join(', ') || 'none'}`)
 console.log(`Task "${task}": ${labels.length} classes → ${labels.join(', ')}`)
 
-const extractor = await loadFeatureExtractor()
-const train = await loadFeatures(task, 'train', labels, extractor)
-const validation = await loadFeatures(task, 'validation', labels, extractor)
-const test = await loadFeatures(task, 'test', labels, extractor)
-extractor.dispose()
+// MobileNet is only loaded if some images are not in the feature cache yet.
+let extractor: tf.GraphModel | undefined
+const getExtractor = async () => (extractor ??= await loadFeatureExtractor())
+const store = await FeatureStore.open()
+const train = await loadFeatures(store, task, 'train', labels, getExtractor)
+const validation = await loadFeatures(store, task, 'validation', labels, getExtractor)
+const test = await loadFeatures(store, task, 'test', labels, getExtractor)
+extractor?.dispose()
 console.log(`train ${train.indices.length} | validation ${validation.indices.length} | test ${test.indices.length}`)
 
-const toTensors = (split: typeof train) => ({
-    xs: tf.tensor2d(split.features, [split.indices.length, FEATURE_EXTRACTOR.features]),
-    ys: tf.tidy(() => tf.oneHot(tf.tensor1d(split.indices, 'int32'), labels.length).toFloat() as tf.Tensor2D),
-})
+const toTensors = (split: typeof train) => featureTensors(split.features, split.indices, labels.length)
 const trainData = toTensors(train)
 const validationData = toTensors(validation)
 const testData = toTensors(test)
 
-/** The only part we train: 1280 features → 256 → classes, with dropout so it cannot memorise the noisy images. */
-const model = tf.sequential({
-    layers: [
-        tf.layers.dropout({ inputShape: [FEATURE_EXTRACTOR.features], rate: 0.2 }),
-        tf.layers.dense({ units: 256, activation: 'relu', kernelRegularizer: tf.regularizers.l2({ l2: 1e-4 }) }),
-        tf.layers.dropout({ rate: 0.5 }),
-        tf.layers.dense({ units: labels.length, activation: 'softmax' }),
-    ],
-})
-model.compile({ optimizer: tf.train.adam(0.001), loss: 'categoricalCrossentropy', metrics: ['accuracy'] })
+const model = buildTransferHead(labels.length)
 model.summary()
 
 await rm(WORK_DIR, { recursive: true, force: true })
 await mkdir(WORK_DIR, { recursive: true })
 await writeFile(path.join(WORK_DIR, LABELS_FILE), `${JSON.stringify(labels, null, 2)}\n`)
 
-const balanced = classWeights(train.indices, labels.length)
-const weights =
-    weightMode === 'none'
-        ? undefined
-        : weightMode === 'sqrt'
-          ? Object.fromEntries(Object.entries(balanced).map(([k, w]) => [k, Math.sqrt(w)]))
-          : balanced
+const weights = weightsFor(weightMode, train.indices, labels.length)
 console.log(`Class weights: ${weightMode}`)
 const patience = Number(values.patience)
 const history: ModelMetricsFile['history'] = []
