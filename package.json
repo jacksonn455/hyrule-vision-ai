@@ -34,7 +34,9 @@
     "ml:split-dataset": "npm run split-dataset -w @hyrule/ml --",
     "ml:train": "npm run train -w @hyrule/ml --",
     "ml:train:games": "npm run train -w @hyrule/ml -- --task games",
-    "ml:train:all": "npm run ml:split-dataset && npm run ml:train && npm run ml:train:games",
+    "ml:train:transfer": "npm run train:transfer -w @hyrule/ml --",
+    "ml:train:transfer:games": "npm run train:transfer -w @hyrule/ml -- --task games",
+    "ml:train:all": "npm run ml:split-dataset && npm run ml:train:transfer && npm run ml:train:transfer:games",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {

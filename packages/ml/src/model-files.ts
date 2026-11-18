@@ -10,6 +10,11 @@ export const METRICS_FILE = 'metrics.json'
 
 export interface ModelMetricsFile {
     task: Task
+    /**
+     * Set for transfer-learning models: model.json is then only the small classifier, and its input is the output
+     * of this pre-trained network (see feature-extractor.ts), not the image. Absent for CNNs trained from scratch.
+     */
+    featureExtractor?: string
     trainedAt: string
     imageSize: number
     augment: boolean

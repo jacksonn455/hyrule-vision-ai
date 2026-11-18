@@ -31,6 +31,8 @@ const { values } = parseArgs({
         'batch-size': { type: 'string', default: '32' },
         patience: { type: 'string', default: '15' },
         'no-augment': { type: 'boolean', default: false },
+        /** Images in memory as float tensors at once: 512 × 96 × 96 × 3 × 4 bytes ≈ 57 MB (plus augmentation copies). */
+        'chunk-size': { type: 'string', default: '512' },
     },
 })
 const task = values.task as Task
@@ -39,8 +41,7 @@ const augment = !values['no-augment']
 const epochs = Number(values.epochs)
 const patience = Number(values.patience)
 const batchSize = Number(values['batch-size'])
-/** Images turned into float tensors at once: 2048 × 96 × 96 × 3 × 4 bytes ≈ 226 MB. */
-const CHUNK_SIZE = 2048
+const CHUNK_SIZE = Number(values['chunk-size'])
 const MODEL_DIR = MODEL_DIRS[task]
 const WORK_DIR = `${MODEL_DIR}.training`
 
@@ -78,7 +79,7 @@ async function measure(split: LoadedSplit): Promise<{ loss: number; acc: number 
     let loss = 0
     let acc = 0
     for (const positions of chunks(range(split.indices.length), CHUNK_SIZE)) {
-        const { xs, ys } = toTensors(split, positions)
+        const { xs, ys } = await toTensors(split, positions)
         const [l, a] = model.evaluate(xs, ys, { batchSize: 256 }) as tf.Scalar[]
         loss += (await l!.data())[0]! * positions.length
         acc += (await a!.data())[0]! * positions.length
@@ -88,10 +89,10 @@ async function measure(split: LoadedSplit): Promise<{ loss: number; acc: number 
 }
 
 /** Predicted class of every image of a split. */
-function predictAll(net: tf.LayersModel, split: LoadedSplit): number[] {
+async function predictAll(net: tf.LayersModel, split: LoadedSplit): Promise<number[]> {
     const predicted: number[] = []
     for (const positions of chunks(range(split.indices.length), CHUNK_SIZE)) {
-        const { xs, ys } = toTensors(split, positions)
+        const { xs, ys } = await toTensors(split, positions)
         predicted.push(
             ...tf.tidy(() => (net.predict(xs, { batchSize: 256 }) as tf.Tensor2D).argMax(1).arraySync() as number[]),
         )
@@ -112,7 +113,7 @@ for (let epoch = 1; epoch <= epochs; epoch++) {
     let loss = 0
     let acc = 0
     for (const positions of chunks(shuffled(train.indices.length), CHUNK_SIZE)) {
-        const { xs, ys } = toTensors(train, positions)
+        const { xs, ys } = await toTensors(train, positions)
         const input = augment ? augmentBatch(xs) : xs
         const { history: logs } = await model.fit(input, ys, {
             epochs: 1,
@@ -153,7 +154,8 @@ for (let epoch = 1; epoch <= epochs; epoch++) {
 
 // Evaluate the saved best model, not the last epoch's weights.
 const best = await tf.loadLayersModel(`file://${WORK_DIR}/model.json`)
-const result = evaluate(test.indices, predictAll(best, test), labels)
+const result = evaluate(test.indices, await predictAll(best, test), labels)
+await Promise.all([train.close(), validation.close(), test.close()])
 
 console.log(`\nBest epoch ${bestEpoch} (val_loss ${bestValLoss.toFixed(3)})`)
 console.log(`Test accuracy: ${(result.accuracy * 100).toFixed(1)}%  (chance ≈ ${(100 / labels.length).toFixed(1)}%)`)

@@ -1,10 +1,10 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import tf from '@tensorflow/tfjs-node'
 
 import { hasAllowedExtension } from '../collection/image-validator.ts'
-import { type DatasetSplit, type Task, datasetClassDir, taskDatasetDir } from '../paths.ts'
+import { DATA_DIR, type DatasetSplit, type Task, datasetClassDir, taskDatasetDir } from '../paths.ts'
 import { IMAGE_CHANNELS, IMAGE_SIZE, imageToPixels } from '../preprocessing.ts'
 import type { TaskClasses } from './classes.ts'
 
@@ -27,39 +27,68 @@ export async function readTaskClasses(task: Task): Promise<TaskClasses> {
 
 export const PIXELS_PER_IMAGE = IMAGE_SIZE * IMAGE_SIZE * IMAGE_CHANNELS
 
+/**
+ * A split whose images are NOT in memory: they were decoded once into data/cache/pixels/<task>-<split>.bin
+ * (RGB bytes, one image after another) and are read back a chunk at a time. Memory stays at one chunk whatever the
+ * dataset size, and later trainings skip the slow decoding of tens of thousands of JPEGs.
+ */
 export interface LoadedSplit {
-    /**
-     * Every image as RGB bytes, one after another (n × 96 × 96 × 3). Bytes, not floats: 30 000 images are ~830 MB
-     * as bytes but 3.3 GB as float32, which does not fit in memory. `toTensors` converts a few thousand at a time.
-     */
-    pixels: Uint8Array
     /** Class index of every image (position in `labels`). */
     indices: number[]
     files: string[]
     numClasses: number
+    /** Reads the bytes of the images at these positions, in this order. */
+    read: (positions: readonly number[]) => Promise<Uint8Array>
+    close: () => Promise<void>
 }
 
-/** Decodes images with a few sharp calls in flight (sharp works on its own threads). */
-async function decodeAll(files: string[], concurrency = 8): Promise<(Uint8Array | null)[]> {
-    const out: (Uint8Array | null)[] = Array.from({ length: files.length }, () => null)
-    let next = 0
-    await Promise.all(
-        Array.from({ length: concurrency }, async () => {
-            while (next < files.length) {
-                const i = next++
-                try {
-                    out[i] = await imageToPixels(files[i]!)
-                } catch (error) {
-                    console.warn(`skipping unreadable ${files[i]}: ${(error as Error).message}`)
-                }
+const PIXEL_CACHE_DIR = path.join(DATA_DIR, 'cache', 'pixels')
+
+interface CacheManifest {
+    imageSize: number
+    labels: readonly string[]
+    /** Every listed file, readable or not, so a changed split is detected. */
+    listed: string[]
+    files: string[]
+    indices: number[]
+}
+
+/** Decodes images with a few sharp calls in flight and appends them, in order, to the cache file. */
+async function buildCache(binFile: string, candidates: { file: string; index: number }[]) {
+    const handle = await open(binFile, 'w')
+    const files: string[] = []
+    const indices: number[] = []
+    try {
+        for (let start = 0; start < candidates.length; start += 64) {
+            const batch = candidates.slice(start, start + 64)
+            const decoded = await Promise.all(
+                batch.map((c) =>
+                    imageToPixels(c.file).catch((error: Error) => {
+                        console.warn(`skipping unreadable ${c.file}: ${error.message}`)
+                        return null
+                    }),
+                ),
+            )
+            for (const [i, pixels] of decoded.entries()) {
+                if (!pixels) continue
+                await handle.write(pixels)
+                files.push(batch[i]!.file)
+                indices.push(batch[i]!.index)
             }
-        }),
-    )
-    return out
+            if (start % 6400 === 0) console.log(`  decoded ${start}/${candidates.length}`)
+        }
+    } finally {
+        await handle.close()
+    }
+    return { files, indices }
 }
 
-/** Loads a whole split as bytes. Unreadable images are skipped, not fatal. */
-export async function loadSplit(task: Task, split: DatasetSplit, labels: readonly string[]): Promise<LoadedSplit> {
+/** Every image of a split with its class index (position in `labels`), in a stable order. */
+export async function listSplit(
+    task: Task,
+    split: DatasetSplit,
+    labels: readonly string[],
+): Promise<{ file: string; index: number }[]> {
     const candidates: { file: string; index: number }[] = []
     for (const [index, label] of labels.entries()) {
         const dir = datasetClassDir(task, split, label)
@@ -67,19 +96,54 @@ export async function loadSplit(task: Task, split: DatasetSplit, labels: readonl
         for (const name of names.filter(hasAllowedExtension).sort())
             candidates.push({ file: path.join(dir, name), index })
     }
-    const decoded = await decodeAll(candidates.map((c) => c.file))
-    const kept = candidates.map((c, i) => ({ ...c, pixels: decoded[i] })).filter((c) => c.pixels)
-    const pixels = new Uint8Array(kept.length * PIXELS_PER_IMAGE)
-    kept.forEach((c, i) => pixels.set(c.pixels!, i * PIXELS_PER_IMAGE))
-    return { pixels, indices: kept.map((c) => c.index), files: kept.map((c) => c.file), numClasses: labels.length }
+    return candidates
+}
+
+/** Lists a split and makes sure its pixel cache is up to date (decoding only when the split changed). */
+export async function loadSplit(task: Task, split: DatasetSplit, labels: readonly string[]): Promise<LoadedSplit> {
+    const candidates = await listSplit(task, split, labels)
+    await mkdir(PIXEL_CACHE_DIR, { recursive: true })
+    const binFile = path.join(PIXEL_CACHE_DIR, `${task}-${split}.bin`)
+    const manifestFile = path.join(PIXEL_CACHE_DIR, `${task}-${split}.json`)
+    const listed = candidates.map((c) => path.relative(DATA_DIR, c.file))
+
+    let manifest = await readFile(manifestFile, 'utf8')
+        .then((text) => JSON.parse(text) as CacheManifest)
+        .catch(() => null)
+    const upToDate =
+        manifest !== null &&
+        manifest.imageSize === IMAGE_SIZE &&
+        JSON.stringify(manifest.labels) === JSON.stringify(labels) &&
+        JSON.stringify(manifest.listed) === JSON.stringify(listed)
+    if (!upToDate) {
+        console.log(`Decoding ${split} (${candidates.length} images) into ${path.relative(DATA_DIR, binFile)}…`)
+        const built = await buildCache(binFile, candidates)
+        manifest = { imageSize: IMAGE_SIZE, labels, listed, ...built }
+        await writeFile(manifestFile, JSON.stringify(manifest))
+    }
+
+    const handle = await open(binFile, 'r')
+    return {
+        indices: manifest!.indices,
+        files: manifest!.files,
+        numClasses: labels.length,
+        read: async (positions) => {
+            const bytes = new Uint8Array(positions.length * PIXELS_PER_IMAGE)
+            for (const [i, p] of positions.entries()) {
+                await handle.read(bytes, i * PIXELS_PER_IMAGE, PIXELS_PER_IMAGE, p * PIXELS_PER_IMAGE)
+            }
+            return bytes
+        },
+        close: () => handle.close(),
+    }
 }
 
 /** Images at `positions` (indexes into the split) → [n, 96, 96, 3] floats in [0, 1] and [n, classes] one-hot labels. */
-export function toTensors(split: LoadedSplit, positions: readonly number[]): { xs: tf.Tensor4D; ys: tf.Tensor2D } {
-    const bytes = new Uint8Array(positions.length * PIXELS_PER_IMAGE)
-    positions.forEach((p, i) =>
-        bytes.set(split.pixels.subarray(p * PIXELS_PER_IMAGE, (p + 1) * PIXELS_PER_IMAGE), i * PIXELS_PER_IMAGE),
-    )
+export async function toTensors(
+    split: LoadedSplit,
+    positions: readonly number[],
+): Promise<{ xs: tf.Tensor4D; ys: tf.Tensor2D }> {
+    const bytes = await split.read(positions)
     const xs = tf.tidy(() =>
         tf
             .tensor4d(bytes, [positions.length, IMAGE_SIZE, IMAGE_SIZE, IMAGE_CHANNELS], 'int32')

@@ -13,10 +13,10 @@ export const IMAGE_CHANNELS = 3
  * `contain` keeps the whole character visible; the padding is black.
  * Returns IMAGE_SIZE * IMAGE_SIZE * 3 bytes in row-major [height][width][channel] order, as TensorFlow expects.
  */
-export async function imageToPixels(input: Buffer | string): Promise<Uint8Array> {
+export async function imageToPixels(input: Buffer | string, size = IMAGE_SIZE): Promise<Uint8Array> {
     const { data } = await sharp(input, { failOn: 'error' })
         .rotate()
-        .resize(IMAGE_SIZE, IMAGE_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0 } })
+        .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0 } })
         .removeAlpha()
         .toColourspace('srgb')
         .raw()

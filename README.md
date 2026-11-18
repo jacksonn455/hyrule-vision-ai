@@ -58,29 +58,31 @@ npm run dev            # API on http://127.0.0.1:3333, web on http://localhost:5
 
 ## Scripts
 
-| Script                       | Description                                                      |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`                | Starts API and web together                                      |
-| `npm run dev:api`            | API only (restarts on change)                                    |
-| `npm run dev:web`            | Web only (Vite dev server, proxies `/api` to the API)            |
-| `npm run build`              | Type-checks and builds the web app                               |
-| `npm run ml:check-env`       | Runs a convolution on the native TF backend + Sharp test         |
-| `npm run ml:collect-dataset` | Downloads, validates and files the raw dataset (resumable)       |
-| `npm run ml:import-images`   | Imports images/sprite sheets saved by hand into `data/inbox`     |
-| `npm run ml:web-search`      | Bulk image search into `data/inbox` (private study, see below)   |
-| `npm run ml:review-dataset`  | Contact sheets for visual review / reject images                 |
-| `npm run ml:dataset-report`  | Writes `docs/research/DATASET-COLLECTION-REPORT.md`              |
-| `npm run ml:sync-metadata`   | Updates `sources.json` after moving/deleting files by hand       |
-| `npm run ml:split-dataset`   | Discovers classes, stratified 70/15/15 split into `data/dataset` |
-| `npm run ml:train`           | Trains the character CNN → `models/hyrule-cnn`                   |
-| `npm run ml:train:games`     | Trains the game CNN (Link / Zelda) → `models/hyrule-cnn-games`   |
-| `npm run ml:train:all`       | `split-dataset` + both trainings                                 |
-| `npm run ml:reorganize-raw`  | Re-files images when sub-folder rules change                     |
-| `npm run typecheck`          | `tsc` in every workspace                                         |
-| `npm run lint`               | ESLint (type-aware)                                              |
-| `npm run format`             | Prettier                                                         |
-| `npm test`                   | Vitest                                                           |
-| `npm run check`              | typecheck + lint + format check + tests                          |
+| Script                            | Description                                                              |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`                     | Starts API and web together                                              |
+| `npm run dev:api`                 | API only (restarts on change)                                            |
+| `npm run dev:web`                 | Web only (Vite dev server, proxies `/api` to the API)                    |
+| `npm run build`                   | Type-checks and builds the web app                                       |
+| `npm run ml:check-env`            | Runs a convolution on the native TF backend + Sharp test                 |
+| `npm run ml:collect-dataset`      | Downloads, validates and files the raw dataset (resumable)               |
+| `npm run ml:import-images`        | Imports images/sprite sheets saved by hand into `data/inbox`             |
+| `npm run ml:web-search`           | Bulk image search into `data/inbox` (private study, see below)           |
+| `npm run ml:review-dataset`       | Contact sheets for visual review / reject images                         |
+| `npm run ml:dataset-report`       | Writes `docs/research/DATASET-COLLECTION-REPORT.md`                      |
+| `npm run ml:sync-metadata`        | Updates `sources.json` after moving/deleting files by hand               |
+| `npm run ml:split-dataset`        | Discovers classes, stratified 70/15/15 split into `data/dataset`         |
+| `npm run ml:train:transfer`       | Character model, MobileNet transfer learning → `models/hyrule-cnn`       |
+| `npm run ml:train:transfer:games` | Game model (Link / Zelda), transfer learning → `models/hyrule-cnn-games` |
+| `npm run ml:train:all`            | `split-dataset` + both transfer-learning trainings                       |
+| `npm run ml:train`                | Character CNN from scratch (slower, less accurate; for comparison)       |
+| `npm run ml:train:games`          | Game CNN from scratch                                                    |
+| `npm run ml:reorganize-raw`       | Re-files images when sub-folder rules change                             |
+| `npm run typecheck`               | `tsc` in every workspace                                                 |
+| `npm run lint`                    | ESLint (type-aware)                                                      |
+| `npm run format`                  | Prettier                                                                 |
+| `npm test`                        | Vitest                                                                   |
+| `npm run check`                   | typecheck + lint + format check + tests                                  |
 
 ## Roadmap
 
@@ -96,25 +98,32 @@ Each step is small and comes with a note in `docs/concepts/`.
 8. ✅ **UI results:** probability bars per class, error states.
 9. ✅ **Improvements:** data augmentation (flip, zoom/crop, brightness) and dropout. Next ideas: more/balanced data,
    comparing architectures, grouping near-duplicate images in the split.
+10. ✅ **Transfer learning:** MobileNet V2 (pre-trained on ImageNet) extracts 1280 features per image; only a small
+    classifier is trained on top. Far more accurate than the CNN from scratch on ~30 000 noisy web images, and
+    retraining takes minutes because the features are cached.
 
 ### Where each step lives
 
-| Step                                                              | Code                                                                                 |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Preprocessing (decode → letterbox 96×96 → RGB bytes)              | [packages/ml/src/preprocessing.ts](packages/ml/src/preprocessing.ts)                 |
-| Classes discovered from `data/raw` folders (characters and games) | [packages/ml/src/dataset/classes.ts](packages/ml/src/dataset/classes.ts)             |
-| Stratified split                                                  | [packages/ml/src/dataset/split.ts](packages/ml/src/dataset/split.ts)                 |
-| Loading tensors (`[0, 1]` floats + one-hot labels)                | [packages/ml/src/dataset/load.ts](packages/ml/src/dataset/load.ts)                   |
-| CNN architecture                                                  | [packages/ml/src/model.ts](packages/ml/src/model.ts)                                 |
-| Training + early stopping + test evaluation                       | [packages/ml/src/scripts/train.ts](packages/ml/src/scripts/train.ts)                 |
-| Data augmentation                                                 | [packages/ml/src/augmentation.ts](packages/ml/src/augmentation.ts)                   |
-| Inference (load model + classify a buffer)                        | [packages/ml/src/classifier.ts](packages/ml/src/classifier.ts)                       |
-| `POST /api/classify`                                              | [apps/api/src/routes/classify.ts](apps/api/src/routes/classify.ts)                   |
-| Probability bars                                                  | [apps/web/src/components/ResultsPanel.tsx](apps/web/src/components/ResultsPanel.tsx) |
-| Metrics (confusion matrix, precision/recall, class weights)       | [packages/ml/src/metrics.ts](packages/ml/src/metrics.ts)                             |
+| Step                                                              | Code                                                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Preprocessing (decode → letterbox 96×96 → RGB bytes)              | [packages/ml/src/preprocessing.ts](packages/ml/src/preprocessing.ts)                   |
+| Classes discovered from `data/raw` folders (characters and games) | [packages/ml/src/dataset/classes.ts](packages/ml/src/dataset/classes.ts)               |
+| Stratified split                                                  | [packages/ml/src/dataset/split.ts](packages/ml/src/dataset/split.ts)                   |
+| Loading tensors (`[0, 1]` floats + one-hot labels)                | [packages/ml/src/dataset/load.ts](packages/ml/src/dataset/load.ts)                     |
+| CNN architecture                                                  | [packages/ml/src/model.ts](packages/ml/src/model.ts)                                   |
+| Training + early stopping + test evaluation                       | [packages/ml/src/scripts/train.ts](packages/ml/src/scripts/train.ts)                   |
+| Data augmentation                                                 | [packages/ml/src/augmentation.ts](packages/ml/src/augmentation.ts)                     |
+| MobileNet feature extractor (download, 224×224 input)             | [packages/ml/src/feature-extractor.ts](packages/ml/src/feature-extractor.ts)           |
+| Feature cache + transfer-learning training                        | [packages/ml/src/scripts/train-transfer.ts](packages/ml/src/scripts/train-transfer.ts) |
+| Inference (load model + classify a buffer)                        | [packages/ml/src/classifier.ts](packages/ml/src/classifier.ts)                         |
+| `POST /api/classify`                                              | [apps/api/src/routes/classify.ts](apps/api/src/routes/classify.ts)                     |
+| Probability bars                                                  | [apps/web/src/components/ResultsPanel.tsx](apps/web/src/components/ResultsPanel.tsx)   |
+| Metrics (confusion matrix, precision/recall, class weights)       | [packages/ml/src/metrics.ts](packages/ml/src/metrics.ts)                               |
 
 The trained models are saved to `models/hyrule-cnn/` and `models/hyrule-cnn-games/` (`model.json`, `weights.bin`,
-`labels.json`, `metrics.json`), git-ignored.
+`labels.json`, `metrics.json`), git-ignored. Transfer-learning models have `featureExtractor` in `metrics.json`: the
+API then runs MobileNet (downloaded once from TF Hub to `models/mobilenet-v2/`) before the classifier. Caches of
+decoded pixels and MobileNet features live in `data/cache/` (git-ignored, rebuilt automatically when a split changes).
 
 ## Adding characters and improving accuracy
 
@@ -158,6 +167,32 @@ Accepted types: `image/jpeg`, `image/png`, `image/webp` (max 10 MB). Errors: `41
 `GET /api/health` also returns the trained classes with their test metrics (`model`, `gameModel`).
 
 ## Results
+
+**Current models (2026-11-17, ~44 000 images after the bulk web search, 21 characters, 9 games).** Same split for
+every run; the test images are never used to choose settings (validation is).
+
+| Character model (21 classes, chance 4.8%)              | Validation acc. | Test accuracy |
+| ------------------------------------------------------ | --------------- | ------------- |
+| CNN from scratch, 96×96 (stopped at epoch 47, ~3 h)    | 26.5%           | —             |
+| MobileNet + classifier, `balanced` class weights       | 33%             | 35.9%         |
+| MobileNet + classifier, `sqrt` class weights (default) | 60.0%           | **58.6%**     |
+| MobileNet + classifier, no class weights               | 61.6%           | 60.7%         |
+
+`balanced` weights made the model avoid Link and Zelda (63% of the images): their recall fell to ~20%. Without
+weights it answers "Link" too often (93% Link recall, 9% for Malon and Paya). `sqrt` is the default: almost the same
+accuracy, much better for the small characters. Weakest classes: Zelda (often in the same picture as Link), Paya,
+Malon and Fi. Web images are noisy (fan art, cosplay, group pictures); reviewing them is the next lever.
+
+Per-character test recall (`sqrt`): link 82%, mipha 69%, ganondorf 68%, daruk 64%, midna 63%, revali 63%,
+sidon 62%, ghirahim 62%, skull-kid 60%, purah 55%, urbosa 52%, saria 44%, riju 41%, zant 40%, fi 33%, zelda 25%,
+tingle 25%, impa 23%, malon 20%, paya 12%.
+
+**Game model (Link + Zelda, 9 games, chance 11.1%):** MobileNet + classifier, test accuracy **64.8%** (validation
+65.8%), up from 50% on 4 games with the CNN from scratch. Recall: Twilight Princess 77%, Wind Waker 72%, Skyward
+Sword 71%, NES 70%, Tears of the Kingdom 68%, Majora's Mask 64%, A Link to the Past 58%, Breath of the Wild 56%,
+Ocarina of Time 53%. BotW and TotK share an art style and are often confused with each other.
+
+Earlier runs, before the bulk web search (CNN from scratch):
 
 Test set (95 images never seen during training), CNN from scratch, 96×96 input:
 

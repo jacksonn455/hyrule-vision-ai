@@ -6,6 +6,7 @@ import tf from '@tensorflow/tfjs-node'
 import type { ClassificationResponse, GameModelInfo, ModelInfo, Prediction } from '@hyrule/shared'
 
 import { pixelsToTensor } from './dataset/load.ts'
+import { FEATURE_EXTRACTOR, FEATURE_EXTRACTOR_DIR, extractFeatures, loadFeatureExtractor } from './feature-extractor.ts'
 import { LABELS_FILE, METRICS_FILE, type ModelMetricsFile, toModelInfo } from './model-files.ts'
 import { MODEL_DIRS } from './paths.ts'
 import { imageToPixels } from './preprocessing.ts'
@@ -45,8 +46,8 @@ async function loadModel(dir: string): Promise<LoadedModel> {
     return { model, labels, metrics }
 }
 
-function predict({ model, labels }: LoadedModel, batch: tf.Tensor4D): Prediction {
-    const output = model.predict(batch) as tf.Tensor2D
+function predict({ model, labels }: LoadedModel, input: tf.Tensor): Prediction {
+    const output = model.predict(input) as tf.Tensor2D
     const scores = output.dataSync()
     output.dispose()
     const probabilities = labels
@@ -63,10 +64,32 @@ function predict({ model, labels }: LoadedModel, batch: tf.Tensor4D): Prediction
 export async function loadClassifier(
     modelDir = DEFAULT_MODEL_DIR,
     gameModelDir = DEFAULT_GAME_MODEL_DIR,
+    featureExtractorDir = FEATURE_EXTRACTOR_DIR,
 ): Promise<ImageClassifier> {
     const characters = await loadModel(modelDir)
     const games = await loadModel(gameModelDir).catch(() => null)
     const gameCharacters = new Set(games?.metrics.characters ?? [])
+    // Transfer-learning models take MobileNet features as input, CNNs from scratch take the 96×96 image.
+    const usesExtractor = (m: LoadedModel | null) => Boolean(m?.metrics.featureExtractor)
+    const extractor =
+        usesExtractor(characters) || usesExtractor(games) ? await loadFeatureExtractor(featureExtractorDir) : null
+
+    /** The input each model expects, computed at most once per image. */
+    async function inputs(image: Buffer) {
+        const tensors: { cnn?: tf.Tensor4D; features?: tf.Tensor2D } = {}
+        const needed = [characters, games].filter((m): m is LoadedModel => m !== null)
+        if (needed.some((m) => !usesExtractor(m))) {
+            const pixels = await imageToPixels(image)
+            tensors.cnn = tf.tidy(() => pixelsToTensor(pixels).expandDims<tf.Tensor4D>(0)) // the model expects a batch
+        }
+        if (extractor && needed.some(usesExtractor)) {
+            const pixels = await imageToPixels(image, FEATURE_EXTRACTOR.inputSize)
+            tensors.features = extractFeatures(extractor, pixels, 1)
+        }
+        return tensors
+    }
+    const inputOf = (m: LoadedModel, t: { cnn?: tf.Tensor4D; features?: tf.Tensor2D }) =>
+        (usesExtractor(m) ? t.features : t.cnn)!
 
     return {
         model: toModelInfo(characters.metrics, characters.labels),
@@ -74,14 +97,15 @@ export async function loadClassifier(
             ? { ...toModelInfo(games.metrics, games.labels), characters: [...gameCharacters].sort() }
             : null,
         async classify(image) {
-            const pixels = await imageToPixels(image)
-            const batch = tf.tidy(() => pixelsToTensor(pixels).expandDims<tf.Tensor4D>(0)) // the model expects a batch
+            const t = await inputs(image)
             try {
-                const character = predict(characters, batch)
-                const game = games && gameCharacters.has(character.prediction) ? predict(games, batch) : null
+                const character = predict(characters, inputOf(characters, t))
+                const game =
+                    games && gameCharacters.has(character.prediction) ? predict(games, inputOf(games, t)) : null
                 return { ...character, game }
             } finally {
-                batch.dispose()
+                if (t.cnn) t.cnn.dispose()
+                if (t.features) t.features.dispose()
             }
         },
     }
